@@ -1,7 +1,7 @@
 version: '3.3'
 
 services:
-  web_apt:
+  web:
     depends_on:
       - app
     image: hub.aiursoft.cn/aiursoft/static
