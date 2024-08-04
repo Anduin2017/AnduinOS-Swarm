@@ -126,8 +126,6 @@ mkdir -p ./images/sites/discovered && cp ./stacks/**/*.conf ./images/sites/disco
 echo "Building images..."
 sudo docker build ./images/sites    -t localhost:8080/box_starting/local_sites:latest
 sudo docker push localhost:8080/box_starting/local_sites:latest
-sudo docker build ./images/docs     -t localhost:8080/box_starting/local_docs:latest
-sudo docker push localhost:8080/box_starting/local_docs:latest
 
 echo "Starting incoming proxy..."
 deploy stacks/incoming/docker-compose.yml incoming # 8080
