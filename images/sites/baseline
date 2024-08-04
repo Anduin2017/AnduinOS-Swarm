@@ -12,10 +12,6 @@
 	}
 	servers :443 {
 		listener_wrappers {
-			proxy_protocol {
-				timeout 2s
-				allow 10.233.0.0/16
-			}
 			http_redirect
 			tls
 		}
