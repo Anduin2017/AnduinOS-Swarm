@@ -1,0 +1,39 @@
+version: '3.3'
+
+services:
+
+  sites:
+    image: localhost:8080/box_starting/local_sites
+    ports:
+      # These ports are for internal use. For external, FRP will handle it.
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+    networks:
+      - proxy_app
+    volumes:
+      - sites-data:/data
+    # Do NOT auto redeploy this. Because this is built locally.
+    # Evertime we run the deploy.sh will update the image.
+    # During incidents, we may need to manually ssh into the server and restart the service.
+
+volumes:
+  sites-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/sites-data
+
+networks:
+  proxy_app:
+    external: true
+
+secrets:
+  frp-token:
+    external: true

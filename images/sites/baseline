@@ -1,0 +1,28 @@
+{
+	email anduin@aiursoft.com
+	log {
+		format transform `{request>remote_ip}	{request>method}		{request>host}			{status}	{resp_headers->Server} 	in:{duration}	{request>uri}` {
+		
+		}
+		output file /var/log/caddy/caddy.log {
+			roll_size 1gb
+			roll_uncompressed
+		}
+		level debug
+	}
+	servers :443 {
+		listener_wrappers {
+			proxy_protocol {
+				timeout 2s
+				allow 10.233.0.0/16
+			}
+			http_redirect
+			tls
+		}
+	}
+}
+
+(hsts) {
+	header Strict-Transport-Security max-age=63072000
+}
+

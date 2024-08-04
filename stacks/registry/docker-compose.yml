@@ -1,0 +1,61 @@
+version: '3.3'
+
+services:
+  registry-ui:
+    depends_on:
+      - registry-server
+    image: joxit/docker-registry-ui:main
+    ports:
+      # These ports are for internal use. External usage is not allowed.
+      - target: 80
+        published: 8080
+        protocol: tcp
+        mode: host
+    networks:
+      - net
+      - proxy_app
+    environment:
+      - SINGLE_REGISTRY=true
+      - REGISTRY_TITLE=hub.aiursoft.cn
+      - DELETE_IMAGES=true
+      - SHOW_CONTENT_DIGEST=true
+      - NGINX_PROXY_PASS_URL=http://registry-server:5000
+      - SHOW_CATALOG_NB_TAGS=true
+      - CATALOG_MIN_BRANCHES=1
+      - CATALOG_MAX_BRANCHES=1
+      - TAGLIST_PAGE_SIZE=100
+      - REGISTRY_SECURED=false
+      - CATALOG_ELEMENTS_LIMIT=1000
+    deploy:
+      labels:
+        swarmpit.service.deployment.autoredeploy: 'true'
+
+  registry-server:
+    image: registry:2.8.2
+    volumes:
+      - registry-data:/var/lib/registry
+    networks:
+      - net
+    environment:
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Origin: '[https://hub.anduinos.com]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Methods: '[HEAD,GET,OPTIONS,DELETE]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Credentials: '[true]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Allow-Headers: '[Authorization,Accept,Cache-Control]'
+      REGISTRY_HTTP_HEADERS_Access-Control-Expose-Headers: '[Docker-Content-Digest]'
+      REGISTRY_STORAGE_DELETE_ENABLED: 'true'
+    deploy:
+      labels:
+        swarmpit.service.deployment.autoredeploy: 'true'
+volumes:
+  registry-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/registry-data
+
+networks:
+  net:
+    driver: overlay
+  proxy_app:
+    external: true
