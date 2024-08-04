@@ -8,7 +8,7 @@ RUN xcaddy build \
 
 # ============================
 # Prepare Caddyfile build Environment
-FROM ubuntu:22 AS config-build-env
+FROM ubuntu:22.04 AS config-build-env
 WORKDIR /app
 COPY . .
 
