@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   app:
-    image: hub.aiursoft.cn/gitea/gitea
+    image: gitea/gitea
     volumes:
       - gitea-data:/data
     networks:
