@@ -10,6 +10,7 @@ services:
     networks:
       - proxy_app
     deploy:
+      replicas: 3
       labels:
         swarmpit.service.deployment.autoredeploy: 'true'
     entrypoint: ["sh", "-c", "/app/static --port 5000 --path /data --allow-directory-browsing"]
