@@ -1,0 +1,35 @@
+version: '3.3'
+
+services:
+  downloader:
+    image: localhost:8080/box_starting/local_mirror
+    volumes:
+      - apt-mirror-data:/var/spool/apt-mirror
+    deploy:
+      labels:
+        swarmpit.service.deployment.autoredeploy: 'true'
+
+  web_apt:
+    depends_on:
+      - app
+    image: hub.aiursoft.cn/aiursoft/static
+    volumes:
+      - apt-mirror-data:/data
+    networks:
+      - proxy_app
+    deploy:
+      labels:
+        swarmpit.service.deployment.autoredeploy: 'true'
+    entrypoint: ["sh", "-c", "/app/static --port 5000 --path /data/mirror/archive.ubuntu.com --allow-directory-browsing"]
+
+volumes:
+  apt-mirror-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/apt-mirror-data
+
+networks:
+  proxy_app:
+    external: true
