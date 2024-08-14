@@ -11,7 +11,7 @@ services:
 
   web_apt:
     depends_on:
-      - app
+      - downloader
     image: hub.aiursoft.cn/aiursoft/static
     volumes:
       - apt-mirror-data:/data

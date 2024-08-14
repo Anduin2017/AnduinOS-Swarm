@@ -2,8 +2,6 @@ version: '3.3'
 
 services:
   web:
-    depends_on:
-      - app
     image: hub.aiursoft.cn/aiursoft/static
     volumes:
       - download-data:/data
