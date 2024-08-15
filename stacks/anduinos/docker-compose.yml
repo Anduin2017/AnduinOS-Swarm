@@ -9,8 +9,6 @@ services:
       replicas: 2
       labels:
         swarmpit.service.deployment.autoredeploy: 'true'
-      update_config:
-        order: start-first
 
   home:
     image: hub.aiursoft.cn/anduin/anduinos-home
@@ -20,8 +18,7 @@ services:
       replicas: 2
       labels:
         swarmpit.service.deployment.autoredeploy: 'true'
-      update_config:
-        order: start-first
+
 
 networks:
   proxy_app:
