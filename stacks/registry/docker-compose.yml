@@ -29,6 +29,8 @@ services:
     deploy:
       labels:
         swarmpit.service.deployment.autoredeploy: 'true'
+      update_config:
+        order: start-first
 
   registry-server:
     image: registry:2.8.2
@@ -46,6 +48,9 @@ services:
     deploy:
       labels:
         swarmpit.service.deployment.autoredeploy: 'true'
+      update_config:
+        order: start-first
+
 volumes:
   registry-data:
     driver: local

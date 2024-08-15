@@ -11,6 +11,8 @@ services:
       replicas: 3
       labels:
         swarmpit.service.deployment.autoredeploy: 'true'
+      update_config:
+        order: start-first
     entrypoint: ["sh", "-c", "/app/static --port 5000 --path /data --allow-directory-browsing"]
 
 volumes:
