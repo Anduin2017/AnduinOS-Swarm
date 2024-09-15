@@ -6,9 +6,6 @@ function install_docker() {
     curl -fsSL get.docker.com -o get-docker.sh
     CHANNEL=stable sh get-docker.sh
     rm get-docker.sh
-
-    # Also install wsdd because it's required by some services
-    sudo apt install wsdd -y
 }
 
 function disable_snap() {
