@@ -40,8 +40,8 @@ function better_performance() {
     sudo sysctl -w fs.aio-max-nr=524288
     sudo sysctl -p
 
-    # Disable swap
-    sudo sudo swapoff -a
+    # Disable swap (Currently, keep swap because of the low memory)
+    #sudo swapoff -a
 
     # Disable snapd
     disable_snap
