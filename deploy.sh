@@ -43,9 +43,9 @@ function better_performance() {
     # Avoid system sleep (If gsettings command exists)
     if command -v gsettings &> /dev/null; then
         echo "Avoid system sleep..."
-        gsettings set org.gnome.desktop.session idle-delay 0
-        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing'
-        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing'
+        gsettings set org.gnome.desktop.session idle-delay 0 || true
+        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' || true
+        gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' || true
     fi
     sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 
