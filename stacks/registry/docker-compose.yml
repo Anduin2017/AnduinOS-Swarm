@@ -16,7 +16,7 @@ services:
       - proxy_app
     environment:
       - SINGLE_REGISTRY=true
-      - REGISTRY_TITLE=hub.aiursoft.cn
+      - REGISTRY_TITLE=hub.anduinos.com
       - DELETE_IMAGES=true
       - SHOW_CONTENT_DIGEST=true
       - NGINX_PROXY_PASS_URL=http://registry-server:5000
