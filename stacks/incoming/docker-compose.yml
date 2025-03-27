@@ -5,7 +5,6 @@ services:
   sites:
     image: localhost:8080/box_starting/local_sites
     ports:
-      # These ports are for internal use. For external, FRP will handle it.
       - target: 80
         published: 80
         protocol: tcp
@@ -32,8 +31,4 @@ volumes:
 
 networks:
   proxy_app:
-    external: true
-
-secrets:
-  frp-token:
     external: true
