@@ -100,6 +100,38 @@ function deploy() {
     sudo docker stack deploy -c "$1" "$2" --detach --prune
 }
 
+function block_port() {
+  local PORT=$1
+  local RULE_MARKER="# Rule to restrict port $PORT to localhost only"
+  local BEFORE_RULES="/etc/ufw/before.rules"
+  
+  # 使用 sudo 检查规则是否已存在
+  if sudo grep -qF "$RULE_MARKER" "$BEFORE_RULES"; then
+    echo "Rule for blocking $PORT already exists in $BEFORE_RULES"
+    return 0
+  fi
+  
+  echo "Adding rule for blocking $PORT to $BEFORE_RULES..."
+  
+  # 使用 sudo sh -c 来处理重定向操作（确保写入文件时具有 root 权限）
+  sudo sh -c "{
+    cat <<EOF
+$RULE_MARKER
+*mangle
+:PREROUTING ACCEPT [0:0]
+-A PREROUTING ! -i lo -p tcp --dport $PORT -j DROP
+COMMIT
+
+EOF
+    cat $BEFORE_RULES
+  } > ${BEFORE_RULES}.new && mv ${BEFORE_RULES}.new $BEFORE_RULES"
+  
+  echo "Reloading UFW to apply changes..."
+  sudo ufw reload
+  
+  echo "Rule has been added to $BEFORE_RULES and UFW has been reloaded"
+}
+
 # Ensure packages needed are ready
 echo "Ensure packages needed are ready..."
 ensure_packages_needed_ready
@@ -216,6 +248,10 @@ EOF
 
 echo "Starting registry..."
 deploy stacks/registry/docker-compose.yml registry # 8080
+
+echo "Blocking external access to the registry..."
+sudo iptables -t mangle -A PREROUTING ! -i lo -p tcp --dport 8080 -j DROP
+block_port 8080
 
 echo "Make sure the registry is ready..."
 sleep 15 # Could not trust result in the first few seconds, because the old registry might still be running
