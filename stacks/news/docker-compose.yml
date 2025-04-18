@@ -1,0 +1,71 @@
+version: '3.9'
+
+services:
+  app:
+    depends_on:
+      - app-db
+    image: aiursoft/moongladepure
+    volumes:
+      - app-files:/data/files
+      - app-aspnet:/data/.aspnet
+    environment:
+      ConnectionStrings__DefaultConnection: Server=app-db;Database=app;Uid=app;Pwd=<app_password>;
+      ConnectionStrings__DbType: MySql
+      Storage__Path: /data/files
+    networks:
+      - net
+      - proxy_app
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+      update_config:
+        order: start-first
+      labels:
+        swarmpit.service.deployment.autoredeploy: 'true'
+
+  app-db:
+    image: mysql
+    volumes:
+      - db-data:/var/lib/mysql
+    environment:
+      - MYSQL_RANDOM_ROOT_PASSWORD=true
+      - MYSQL_DATABASE=app
+      - MYSQL_USER=app
+      - MYSQL_PASSWORD=<app_password>
+    networks:
+      - net
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+      labels:
+        swarmpit.service.deployment.autoredeploy: 'true'
+
+networks:
+  net:
+    driver: overlay
+  proxy_app:
+    external: true
+
+volumes:
+  app-files:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/news/app-files
+  app-aspnet:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/news/app-aspnet
+  db-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/news/db-data
