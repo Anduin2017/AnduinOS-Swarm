@@ -4,7 +4,8 @@ FROM caddy:builder AS caddy-build-env
 
 RUN xcaddy build \
     --with github.com/ueffel/caddy-brotli \
-    --with github.com/caddyserver/transform-encoder
+    --with github.com/caddyserver/transform-encoder \
+    --with github.com/mholt/caddy-ratelimit
 
 # ============================
 # Prepare Caddyfile build Environment
