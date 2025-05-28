@@ -40,10 +40,10 @@ services:
       resources:
         limits:
           cpus: '0.30'
-          memory: 1G
+          memory: 2G
         reservations:
           cpus: '0.15'
-          memory: 128M
+          memory: 1G
       labels:
         swarmpit.service.deployment.autoredeploy: 'true'
 
