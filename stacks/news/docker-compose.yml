@@ -18,7 +18,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
+          cpus: '2'
           memory: 4G
       update_config:
         order: start-first
@@ -39,7 +39,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
+          cpus: '2'
           memory: 4G
       labels:
         swarmpit.service.deployment.autoredeploy: 'true'
