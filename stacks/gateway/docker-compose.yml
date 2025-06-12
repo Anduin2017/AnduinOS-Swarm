@@ -1,0 +1,32 @@
+version: '3.9'
+
+services:
+  vpn:
+    image: hub.aiursoft.cn/aiursoft/internalimages/gateway
+    networks:
+      - proxy_app
+    volumes:
+      - vpn-data:/var/log/xray
+      - /etc/hosts:/etc/hosts
+    secrets:
+      - source: xray-uuid
+        target: user_id
+    deploy:
+      labels:
+        swarmpit.service.deployment.autoredeploy: 'true'
+
+networks:
+  proxy_app:
+    external: true
+
+volumes:
+  vpn-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/vpn-data
+
+secrets:
+  xray-uuid:
+    external: true

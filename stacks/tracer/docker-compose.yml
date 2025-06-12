@@ -1,0 +1,21 @@
+version: '3.9'
+
+services:
+  app:
+    image: hub.aiursoft.cn/aiursoft/tracer
+    volumes:
+      - tracer-data:/data
+    networks:
+      - proxy_app
+    deploy:
+      replicas: 3
+      labels:
+        swarmpit.service.deployment.autoredeploy: 'true'
+
+volumes:
+  tracer-data:
+    driver: local
+
+networks:
+  proxy_app:
+    external: true
