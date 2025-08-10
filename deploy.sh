@@ -244,7 +244,7 @@ for network in $external_networks; do
   if [ "$network" == "---" ]; then
     continue
   fi
-  print_ok "Creating network $network ... on subnet 10.${subnet_third_octet}.0.0/16"
+  print_ok "Ensuring network $network exists..."
   create_network "$network" "10.${subnet_third_octet}.0.0/16"
   subnet_third_octet=$((subnet_third_octet + 1))
 done
