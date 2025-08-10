@@ -16,6 +16,7 @@ services:
       - GF_AUTH_GENERIC_ALLOW_ASSIGN_GRAFANA_ADMIN=true
       - GF_AUTH_GENERIC_ROLE_ATTRIBUTE_STRICT=true
       - GF_AUTH_OAUTH_AUTO_LOGIN=true
+      - GF_PLUGINS_PLUGIN_ADMIN_ENABLED=true
     networks:
       - internal
       - proxy_app
