@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  grafana:
+    depends_on:
+      - prometheus # Grafana needs to be using Prometheus as a data source
+    image: grafana/grafana
+    volumes:
+      - grafana-config:/etc/grafana
+      - grafana-data:/var/lib/grafana
+    environment:
+      - TZ=UTC
+      - GF_SERVER_ROOT_URL=http://grafana.anduinos.com
+      - GF_AUTH_GENERIC_OAUTH_GROUPS_ATTRIBUTE_PATH=groups
+      - GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH=contains(groups, 'grafana-admins') && 'Admin' || contains(groups, 'grafana-editors') && 'Editor' || 'Viewer'
+      - GF_AUTH_GENERIC_ALLOW_ASSIGN_GRAFANA_ADMIN=true
+      - GF_AUTH_GENERIC_ROLE_ATTRIBUTE_STRICT=true
+      - GF_AUTH_OAUTH_AUTO_LOGIN=true
+    networks:
+      - internal
+      - proxy_app
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+      update_config:
+        order: stop-first
+        delay: 60s
+
+networks:
+  internal:
+    driver: overlay
+  proxy_app:
+    external: true
+
+volumes:
+  grafana-config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/health/grafana-config
+  grafana-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/health/grafana-data

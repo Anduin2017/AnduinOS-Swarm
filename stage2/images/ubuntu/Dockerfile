@@ -4,8 +4,8 @@ COPY source.list /suggested.sources.list
 
 RUN apt update && apt install -y curl
 
-RUN if curl -f http://mirror.aiursoft.cn; then \
-        echo "Using mirror.aiursoft.cn" && \
+RUN if curl -f https://ftp.uni-stuttgart.de; then \
+        echo "Using ftp.uni-stuttgart.de" && \
         cp /suggested.sources.list /etc/apt/sources.list && \
         apt update; \
     fi
