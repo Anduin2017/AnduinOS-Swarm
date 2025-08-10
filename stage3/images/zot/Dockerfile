@@ -11,7 +11,7 @@ RUN apt-get update \
 
 RUN mkdir -p /etc/zot /config /data
 
-RUN wget -O /usr/local/bin/zot "https://github.com/project-zot/zot/releases/download/${ZOT_VERSION}/zot-linux-amd64" \
+RUN wget -O /usr/local/bin/zot "https://git.aiursoft.cn/PublicVault/zot/releases/download/${ZOT_VERSION}/zot-linux-amd64" \
     && chmod +x /usr/local/bin/zot
 
 COPY default-config.json /etc/zot/default-config.json
