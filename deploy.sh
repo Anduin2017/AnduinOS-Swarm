@@ -238,7 +238,7 @@ while IFS= read -r file; do
 done < <(find ./stage* -name 'docker-compose.yml' -type f)
 
 print_ok "Creating networks..."
-subnet_third_octet=233
+subnet_third_octet=133
 external_networks=$(find ./stage* -name 'docker-compose.yml' -type f | xargs yq eval '.networks | to_entries | .[] | select(.value.external == true) | .key' 2>/dev/null | sort | uniq | tr -d '\r')
 for network in $external_networks; do
   if [ "$network" == "---" ]; then
