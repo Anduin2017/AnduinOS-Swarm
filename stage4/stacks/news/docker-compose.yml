@@ -9,9 +9,13 @@ services:
       - app-files:/data/files
       - app-aspnet:/data/.aspnet
     environment:
-      ConnectionStrings__DefaultConnection: Server=app-db;Database=app;Uid=app;Pwd=<app_password>;
-      ConnectionStrings__DbType: MySql
-      Storage__Path: /data/files
+      - ConnectionStrings__DefaultConnection=Server=app-db;Database=app;Uid=app;Pwd=<app_password>;
+      - ConnectionStrings__DbType=MySql
+      - Storage__Path=/data/files
+      - AppSettings__AuthProvider=OIDC
+      - OIDC__Authority=https://auth.aiursoft.cn/application/o/anduinos-blog
+      - OIDC__ClientId={{ANDUINOS_BLOG_CLIENT_ID}}
+      - OIDC__ClientSecret={{ANDUINOS_BLOG_CLIENT_SECRET}}
     networks:
       - net
       - proxy_app
