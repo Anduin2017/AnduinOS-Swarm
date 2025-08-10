@@ -14,7 +14,6 @@ services:
         protocol: tcp
         mode: host
     networks:
-      - frp_net
       - proxy_app
     volumes:
       - sites-data:/data
