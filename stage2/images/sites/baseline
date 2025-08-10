@@ -1,0 +1,48 @@
+{
+	email anduin@aiursoft.com
+	log {
+		format json
+		output file /data/caddy/logs/web.log {
+			roll_size 1gb
+			roll_uncompressed
+		}
+		level debug
+	}
+	servers :443 {
+		listener_wrappers {
+			proxy_protocol {
+				timeout 2s
+				allow 10.233.0.0/16
+			}
+			http_redirect
+			tls
+		}
+	}
+}
+
+(hsts) {
+	header Strict-Transport-Security max-age=63072000
+}
+
+(rate_limit) {
+	rate_limit {
+		zone ip_limit {
+			key    {remote_host}
+			events 8000
+			window 600s
+		}
+		log_key
+	}
+}
+
+(rate_limit_api) {
+	rate_limit {
+		zone ip_limit_api {
+			key    {remote_host}
+			events 13000
+			window 600s
+		}
+		log_key
+	}
+}
+

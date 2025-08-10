@@ -1,0 +1,4 @@
+deb https://ftp.uni-stuttgart.de/ubuntu/ plucky main restricted universe multiverse
+deb http://ftp.uni-stuttgart.de/ubuntu/ plucky-updates main restricted universe multiverse
+deb http://ftp.uni-stuttgart.de/ubuntu/ plucky-backports main restricted universe multiverse
+deb http://ftp.uni-stuttgart.de/ubuntu/ plucky-security main restricted universe multiverse

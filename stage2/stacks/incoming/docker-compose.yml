@@ -1,0 +1,62 @@
+version: '3.9'
+
+services:
+  sites:
+    image: localhost:8080/box_starting/local_sites
+    ports:
+      # These ports are for internal use. For external, FRP will handle it.
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+    networks:
+      - frp_net
+      - proxy_app
+    volumes:
+      - sites-data:/data
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '8.0'
+          memory: 16G
+      update_config:
+        order: stop-first
+        delay: 60s
+    # Do NOT auto redeploy this. Because this is built locally.
+    # Every time we run the deploy.sh will update the image.
+    # During incidents, we may need to manually ssh into the server and restart the service.
+
+  pysyncer:
+    image: localhost:8080/box_starting/local_pysyncer
+    networks:
+      - clickhouse_net
+    volumes:
+      - sites-data:/data:ro
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+      update_config:
+        order: stop-first
+        delay: 60s
+
+volumes:
+  sites-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/sites-data
+
+networks:
+  proxy_app:
+    external: true
+  clickhouse_net:
+    external: true

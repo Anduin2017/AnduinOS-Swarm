@@ -1,6 +1,61 @@
 #!/bin/bash
+set -euo pipefail
 
-set -e
+#==========================
+# Color
+#==========================
+export Green="\033[32m"
+export Red="\033[31m"
+export Yellow="\033[33m"
+export Blue="\033[36m"
+export Font="\033[0m"
+export GreenBG="\033[42;37m"
+export RedBG="\033[41;37m"
+export INFO="${Blue}[ INFO ]${Font}"
+export OK="${Green}[  OK  ]${Font}"
+export ERROR="${Red}[FAILED]${Font}"
+export WARNING="${Yellow}[ WARN ]${Font}"
+
+#==========================
+# Print Colorful Text
+#==========================
+function print_ok() {
+  echo -e "${OK} ${Blue} $1 ${Font}"
+}
+
+function print_info() {
+  echo -e "${INFO} ${Font} $1"
+}
+
+function print_error() {
+  echo -e "${ERROR} ${Red} $1 ${Font}"
+}
+
+function print_warn() {
+  echo -e "${WARNING} ${Yellow} $1 ${Font}"
+}
+
+function judge() {
+  if [[ 0 -eq $? ]]; then
+    print_ok "$1 succeeded"
+    sleep 0.2
+  else
+    print_error "$1 failed"
+    exit 1
+  fi
+}
+
+# Determine which env file to use
+if [ -f ".env.prod" ]; then
+    ENV_FILE=".env.prod"
+    print_ok "Using .env.prod for configuration."
+elif [ -f ".env" ]; then
+    ENV_FILE=".env"
+    print_warn "Using .env for configuration."
+else
+    ENV_FILE=""
+    print_ok "No .env or .env.prod file found. Proceeding without variable substitution."
+fi
 
 function install_yq() {
     local download_link="https://github.com/mikefarah/yq/releases/download/v4.45.1/yq_linux_amd64"
@@ -39,17 +94,41 @@ function ensure_packages_needed_ready() {
     ensure_docker_ready
 }
 
-function better_performance() {
+function ensure_nvidia_gpu() {
+    # ensure /usr/bin/nvidia-smi exists
+    if [ ! -f /usr/bin/nvidia-smi ]; then
+        local doc_link=https://docs.anduinos.com/Applications/Development/Docker/Docker.html
+        print_error "Please install Nvidia driver. See $doc_link for more information."
+        exit 1
+    fi
+
+    ulimit -n 65535
+    valgrind /usr/bin/nvidia-smi -L 2> /dev/null | grep -q "GPU 0" || {
+        local doc_link=https://docs.anduinos.com/Applications/Development/Docker/Docker.html
+        print_error "Please ensure you have Nvidia GPU. See $doc_link for more information."
+        exit 1
+    }
+
+    # ensure package: nvidia-container-toolkit and nvidia-docker2
+    apt list --installed | grep -q nvidia-container-toolkit || {
+        local doc_link=https://docs.anduinos.com/Applications/Development/Docker/Docker.html
+        print_error "Please install nvidia-container-toolkit and nvidia-docker2. See $doc_link for more information."
+        exit 1
+    }
+}
+
+better_performance() {
     # Avoid system sleep (If gsettings command exists)
-    if command -v gsettings &> /dev/null; then
-        echo "Avoid system sleep..."
+    if command -v gsettings &>/dev/null; then
+        print_warn "Disabling sleep via gsettings..."
         gsettings set org.gnome.desktop.session idle-delay 0 || true
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type 'nothing' || true
         gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type 'nothing' || true
     fi
+
     sudo systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target
 
-    # Tuning for better performance
+    print_ok "Applying runtime sysctl tweaks for performance..."
     sudo sysctl -w net.core.rmem_max=2500000
     sudo sysctl -w net.core.wmem_max=2500000
     sudo sysctl -w net.ipv4.tcp_congestion_control=bbr
@@ -58,9 +137,8 @@ function better_performance() {
     sudo sysctl -w fs.inotify.max_user_watches=524288
     sudo sysctl -w fs.inotify.max_queued_events=524288
     sudo sysctl -w fs.aio-max-nr=2097152
-    sudo sysctl -p
 
-    # Set timezone to UTC
+    print_ok "Setting system timezone to UTC..."
     sudo timedatectl set-timezone UTC
 }
 
@@ -68,21 +146,28 @@ function clean_up_docker() {
     # if there is no stack deployed, run the system prune command
     # else, log and skip cleaning.
     if [ $(sudo docker stack ls --format '{{.Name}}' | wc -l) -eq 0 ]; then
-        echo "Seems running on a new cluster. Cleaning up docker..."
+        print_warn "Seems running on a new cluster. Cleaning up docker..."
         sudo docker system prune -a --volumes -f
+        sudo docker network prune -f
         #sudo docker builder prune -f
     else
-        echo "There are stacks already deployed and running. Skip cleaning."
+        print_ok "There are stacks already deployed and running. Skip cleaning."
     fi
 }
 
 function create_secret() {
     local secret_name=$1
-    local known_secrets=$(sudo docker secret ls --format '{{.Name}}')
-    if [[ $known_secrets != *"$secret_name"* ]]; then
-        echo "Please enter $secret_name secret"
-        read -s secret_value
-        echo $secret_value | sudo docker secret create $secret_name -
+    if ! sudo docker secret ls --format '{{.Name}}' | grep -Fxq "$secret_name"; then
+        local secret_value
+        if [ -t 0 ]; then
+          read -rs -p "Enter value for secret '$secret_name': " secret_value
+          echo
+        else
+          read -rs -p "Enter value for secret '$secret_name': " secret_value < /dev/tty
+          echo
+        fi
+
+        printf '%s' "$secret_value" | sudo docker secret create "$secret_name" -
     fi
 }
 
@@ -91,203 +176,235 @@ function create_network() {
     subnet=$2
     known_networks=$(sudo docker network ls --format '{{.Name}}')
     if [[ $known_networks != *"$network_name"* ]]; then
+        print_warn "Creating network $network_name with subnet $subnet..."
         networkId=$(sudo docker network create --driver overlay --attachable --subnet $subnet --scope swarm $network_name)
-        echo "Network $network_name created with id $networkId"
+        print_ok "Network $network_name created with id $networkId"
     fi
 }
 
 function deploy() {
-    sudo docker stack deploy -c "$1" "$2" --detach --prune
-}
+    local original_compose_file=$1
+    local stack_name=$2
+    local temp_compose_file=$(mktemp)
 
-function block_port() {
-  local PORT=$1
-  local RULE_MARKER="# Rule to restrict port $PORT to localhost only"
-  local BEFORE_RULES="/etc/ufw/before.rules"
-  
-  # 使用 sudo 检查规则是否已存在
-  if sudo grep -qF "$RULE_MARKER" "$BEFORE_RULES"; then
-    echo "Rule for blocking $PORT already exists in $BEFORE_RULES"
-    return 0
-  fi
-  
-  echo "Adding rule for blocking $PORT to $BEFORE_RULES..."
-  
-  # 使用 sudo sh -c 来处理重定向操作（确保写入文件时具有 root 权限）
-  sudo sh -c "{
-    cat <<EOF
-$RULE_MARKER
-*mangle
-:PREROUTING ACCEPT [0:0]
--A PREROUTING ! -i lo -p tcp --dport $PORT -j DROP
-COMMIT
+    # Always copy to a temporary file to avoid modifying the original
+    cp "$original_compose_file" "$temp_compose_file"
 
-EOF
-    cat $BEFORE_RULES
-  } > ${BEFORE_RULES}.new && mv ${BEFORE_RULES}.new $BEFORE_RULES"
-  
-  echo "Reloading UFW to apply changes..."
-  sudo ufw reload
-  
-  echo "Rule has been added to $BEFORE_RULES and UFW has been reloaded"
+    # If an environment file is found, perform substitutions
+    if [ -n "$ENV_FILE" ]; then
+        # Read non-empty, non-comment lines from the env file
+        grep -v -e '^#' -e '^$' "$ENV_FILE" | while IFS='=' read -r key value; do
+            # Escape slashes and ampersands for sed
+            escaped_value=$(printf '%s\n' "$value" | sed -e 's/[\/&]/\\&/g')
+            # Use a different delimiter for sed to handle special characters in values
+            sed -i "s/{{$key}}/$escaped_value/g" "$temp_compose_file"
+        done
+    fi
+
+    print_ok "Deploying stack '$stack_name' with compose file '$original_compose_file'..."
+    sudo docker stack deploy -c "$temp_compose_file" "$stack_name" --detach --prune --with-registry-auth
+
+    # Clean up the temporary file
+    rm "$temp_compose_file"
 }
 
 # Ensure packages needed are ready
-echo "Ensure packages needed are ready..."
+print_ok "Ensure packages needed are ready..."
 ensure_packages_needed_ready
 
-echo "Tuning for better performance..."
+# Ensure has Nvidia GPU and have installed nvidia-container-toolkit and nvidia-docker2
+print_ok "Ensure has Nvidia GPU and have installed..."
+if [ -f /usr/bin/nvidia-smi ]; then
+    ensure_nvidia_gpu
+else
+    print_warn "Nvidia GPU not found. Skipping Nvidia GPU configuration. GPU pass-through will not be available."
+fi
+
+# Tuning for better performance
+print_ok "Tuning for better performance..."
 better_performance
 
-echo "Cleaning up docker (if no stack deployed)..."
+print_ok "Cleaning up docker (if no stack deployed)..."
 clean_up_docker
 
-echo "Creating secrets..."
-find ./stacks -name 'docker-compose.yml' -type f | while read -r file; do
-  yq eval '.secrets | to_entries | .[] | select(.value.external == true) | .key' "$file" | while read -r secret_name; do
+print_ok "Creating secrets..."
+while IFS= read -r file; do
+  while IFS= read -r secret_name; do
     if [ -n "$secret_name" ]; then
-      echo "Creating secret $secret_name..."
+      print_ok "Creating secret $secret_name..."
       create_secret "$secret_name"
     fi
-  done
-done
+  done < <(yq eval '.secrets | to_entries | .[] | select(.value.external == true) | .key' "$file")
+done < <(find ./stage* -name 'docker-compose.yml' -type f)
 
-echo "Creating networks..."
+print_ok "Creating networks..."
 subnet_third_octet=233
-external_networks=$(find ./stacks -name 'docker-compose.yml' -type f | xargs yq eval '.networks | to_entries | .[] | select(.value.external == true) | .key' 2>/dev/null | sort | uniq)
+external_networks=$(find ./stage* -name 'docker-compose.yml' -type f | xargs yq eval '.networks | to_entries | .[] | select(.value.external == true) | .key' 2>/dev/null | sort | uniq)
 for network in $external_networks; do
   if [ "$network" == "---" ]; then
     continue
   fi
-  echo "Creating network $network ... on subnet 10.${subnet_third_octet}.0.0/16"
+  print_ok "Creating network $network ... on subnet 10.${subnet_third_octet}.0.0/16"
   create_network "$network" "10.${subnet_third_octet}.0.0/16"
   subnet_third_octet=$((subnet_third_octet + 1))
 done
 
-echo "Creating data folders..."
+print_ok "Creating data folders..."
 find . -name 'docker-compose.yml' | while read file; do
   awk '{if(/device:/) print $2}' "$file" | while read -r path; do
-    sudo mkdir -p "$path" && echo "Created $path"
+    sudo mkdir -p "$path"
   done
 done
 
-echo "Opening firewall ports..."
-find . -name 'docker-compose.yml' | while read -r file; do
-  yq eval -r '.services[].ports[]? | select(has("published")) | "\(.published) \(.protocol)"' "$file" | while read -r published protocol; do
-    if [ -z "$protocol" ]; then
-      continue
-    else
-      sudo ufw allow "${published}/${protocol}" && echo "Allowed ${published}/${protocol}"
-    fi
+#=============================
+# Nvidia GPU Part
+#=============================
+if [ -f /usr/bin/nvidia-smi ]; then
+  print_ok "Configuring docker daemon for Nvidia GPU..."
+  GPU_IDS=$(valgrind /usr/bin/nvidia-smi -a 2> /dev/null | grep "GPU UUID" | awk '{print substr($4,5,36)}')
+  print_ok "Detected GPU UUIDs:"
+  print_ok "$GPU_IDS"
+  JSON_GPU_RESOURCES=""
+  for ID in $GPU_IDS; do
+      JSON_GPU_RESOURCES+="\"NVIDIA-GPU=$ID\","
   done
-done
+  JSON_GPU_RESOURCES=${JSON_GPU_RESOURCES%,}  # 去掉最后一个逗号
 
-sudo tee /etc/docker/daemon.json > /dev/null <<EOF
+  if [ -f /etc/docker/daemon.json ]; then
+      old_hash_daemon=$(sha256sum /etc/docker/daemon.json | awk '{print $1}')
+  else
+      old_hash_daemon=""
+  fi
+
+  if [ -f /etc/nvidia-container-runtime/config.toml ]; then
+      old_hash_nvidia=$(sha256sum /etc/nvidia-container-runtime/config.toml | awk '{print $1}')
+  else
+      old_hash_nvidia=""
+  fi
+
+  sudo tee /etc/docker/daemon.json > /dev/null <<EOF
 {
+  "runtimes": {
+    "nvidia": {
+      "path": "/usr/bin/nvidia-container-runtime",
+      "runtimeArgs": []
+    }
+  },
+  "default-runtime": "nvidia",
+  "node-generic-resources": [
+    $JSON_GPU_RESOURCES
+  ],
   "insecure-registries": [
     "localhost:8080"
   ]
 }
 EOF
+  sudo sed -i 's/#swarm-resource = "DOCKER_RESOURCE_GPU"/swarm-resource = "DOCKER_RESOURCE_GPU"/' /etc/nvidia-container-runtime/config.toml
 
-# #=============================
-# # Nvidia GPU Part
-# #=============================
-# echo "Configuring docker daemon for Nvidia GPU..."
-# GPU_IDS=$(valgrind /usr/bin/nvidia-smi -a 2> /dev/null | grep "GPU UUID" | awk '{print substr($4,5,36)}')
-# echo "Detected GPU UUIDs:"
-# echo "$GPU_IDS"
-# JSON_GPU_RESOURCES=""
-# for ID in $GPU_IDS; do
-#     JSON_GPU_RESOURCES+="\"NVIDIA-GPU=$ID\","
-# done
-# JSON_GPU_RESOURCES=${JSON_GPU_RESOURCES%,}  # 去掉最后一个逗号
+  new_hash_daemon=$(sha256sum /etc/docker/daemon.json | awk '{print $1}')
+  new_hash_nvidia=$(sha256sum /etc/nvidia-container-runtime/config.toml | awk '{print $1}')
+  if [ "$old_hash_daemon" != "$new_hash_daemon" ] || [ "$old_hash_nvidia" != "$new_hash_nvidia" ]; then
+      print_warn "Configuration files changed. Restarting docker service..."
+      sudo systemctl restart docker.service
+  else
+      print_ok "Configuration files not changed."
+  fi
+else
+  print_warn "Nvidia GPU not found. Skipping Nvidia GPU configuration. GPU pass-through will not be available."
+fi
+#=============================
+# Nvidia GPU Part end
+#=============================
 
-# if [ -f /etc/docker/daemon.json ]; then
-#     old_hash_daemon=$(sha256sum /etc/docker/daemon.json | awk '{print $1}')
-# else
-#     old_hash_daemon=""
-# fi
+print_warn "=============================================================================="
+print_warn "   Starting stage 0: Mission is to start a simple registry"
+print_warn "=============================================================================="
+sleep 3
 
-# if [ -f /etc/nvidia-container-runtime/config.toml ]; then
-#     old_hash_nvidia=$(sha256sum /etc/nvidia-container-runtime/config.toml | awk '{print $1}')
-# else
-#     old_hash_nvidia=""
-# fi
+sudo docker compose -f ./stage0/registry/docker-compose.yml up -d --pull always --no-recreate --remove-orphans
 
-# sudo tee /etc/docker/daemon.json > /dev/null <<EOF
-# {
-#   "runtimes": {
-#     "nvidia": {
-#       "path": "/usr/bin/nvidia-container-runtime",
-#       "runtimeArgs": []
-#     }
-#   },
-#   "default-runtime": "nvidia",
-#   "node-generic-resources": [
-#     $JSON_GPU_RESOURCES
-#   ],
-#   "insecure-registries": [
-#     "localhost:8080"
-#   ]
-# }
-# EOF
-# sudo sed -i 's/#swarm-resource = "DOCKER_RESOURCE_GPU"/swarm-resource = "DOCKER_RESOURCE_GPU"/' /etc/nvidia-container-runtime/config.toml
+#deploy stage0/registry/docker-compose.yml registry # 8080
 
-# new_hash_daemon=$(sha256sum /etc/docker/daemon.json | awk '{print $1}')
-# new_hash_nvidia=$(sha256sum /etc/nvidia-container-runtime/config.toml | awk '{print $1}')
-# if [ "$old_hash_daemon" != "$new_hash_daemon" ] || [ "$old_hash_nvidia" != "$new_hash_nvidia" ]; then
-#     echo "Configuration files changed. Restarting docker service..."
-#     sudo systemctl restart docker.service
-# else
-#     echo "Configuration files not changed."
-# fi
-# #=============================
-# # Nvidia GPU Part end
-# #=============================
-
-echo "Starting registry..."
-deploy stacks/registry/docker-compose.yml registry # 8080
-
-echo "Blocking external access to the registry..."
-sudo iptables -t mangle -A PREROUTING ! -i lo -p tcp --dport 8080 -j DROP
-block_port 8080
-
-echo "Make sure the registry is ready..."
-sleep 15 # Could not trust result in the first few seconds, because the old registry might still be running
-while curl -s http://localhost:8080/ > /dev/null; [ $? -ne 0 ]; do
-    echo "Waiting for registry(http://localhost:8080) to start..."
-    sleep 1
-done
-
-echo "Prebuild images..."
-mkdir -p ./images/sites/discovered && cp ./stacks/**/*.conf ./images/sites/discovered
-
-echo "Building images..."
-sudo docker build ./images/sites    -t localhost:8080/box_starting/local_sites:latest
-sudo docker push localhost:8080/box_starting/local_sites:latest
-
-echo "Starting incoming proxy..."
-deploy stacks/incoming/docker-compose.yml incoming # 8080
-
-echo "Make sure the registry is ready..."
+print_ok "Make sure the registry is ready..."
 sleep 5 # Could not trust result in the first few seconds, because the old registry might still be running
-while curl -s https://hub.anduinos.com > /dev/null; [ $? -ne 0 ]; do
-    echo "Waiting for registry (https://hub.anduinos.com) to start... ETA: 25s"
+while curl -s http://localhost:8080/ > /dev/null; [ $? -ne 0 ]; do
+    print_warn "Waiting for registry(http://localhost:8080/) to start..."
     sleep 1
 done
 
-echo "Deploying business stacks..."
+print_warn "=============================================================================="
+print_warn "   Ending stage 0: Registry is ready at http://localhost:8080/"
+print_warn ""
+print_warn "   Starting stage 1: Mission is to mirror public images to the simple registry"
+print_warn "=============================================================================="
+sleep 3
+
+bash ./stage1/mirror.sh
+
+print_warn "=============================================================================="
+print_warn "   Ending stage 1: Images are mirrored."
+print_warn ""
+print_warn "   Starting stage 2: Mission is to build and start basic web infrastructure"
+print_warn "=============================================================================="
+sleep 3
+
+rm -rf ./stage2/images/sites/discovered
+mkdir -p ./stage2/images/sites/discovered && \
+    cp ./stage2/stacks/**/*.conf ./stage2/images/sites/discovered && \
+    cp ./stage3/stacks/**/*.conf ./stage2/images/sites/discovered && \
+    cp ./stage4/stacks/**/*.conf ./stage2/images/sites/discovered
+
+print_ok "Building local ubuntu..."
+sudo docker build ./stage2/images/ubuntu   -t localhost:8080/box_starting/local_ubuntu:latest
+sudo docker push localhost:8080/box_starting/local_ubuntu:latest
+print_ok "Building local caddy..."
+sudo docker build ./stage2/images/sites    -t localhost:8080/box_starting/local_sites:latest
+sudo docker push localhost:8080/box_starting/local_sites:latest
+print_ok "Building local pysyncer..."
+sudo docker build ./stage2/images/pysyncer    -t localhost:8080/box_starting/local_pysyncer:latest
+sudo docker push localhost:8080/box_starting/local_pysyncer:latest
+
+print_ok "Starting incoming proxy..."
+deploy stage2/stacks/incoming/docker-compose.yml incoming # 8080
+
+print_ok "Make sure the caddy is ready..."
+sleep 5 # Could not trust result in the first few seconds, because the old registry might still be running
+while curl -s http://test.aiursoft.cn > /dev/null; [ $? -ne 0 ]; do
+    print_warn "Waiting for caddy (http://test.aiursoft.cn) to start... ETA: 25s"
+    sleep 1
+done
+
+print_warn "=============================================================================="
+print_warn "   Ending stage 2: Basic web infrastructure is ready."
+print_warn ""
+print_warn "   Starting stage 3: Mission is to build and start Zot"
+print_warn "=============================================================================="
+sleep 3
+
+print_ok "Building local zot..."
+sudo docker build ./stage3/images/zot -t localhost:8080/box_starting/local_zot:latest
+sudo docker push localhost:8080/box_starting/local_zot:latest
+
+print_ok "Starting Zot..."
+deploy stage3/stacks/zot/docker-compose.yml zot
+
+print_ok "Making sure the zot is ready..."
+sleep 5 # Could not trust result in the first few seconds, because the old zot might still be running
+while curl -s https://hub.anduinos.com > /dev/null; [ $? -ne 0 ]; do
+    print_warn "Waiting for registry (https://hub.anduinos.com) to start... ETA: 25s"
+    sleep 1
+done
+
+print_warn "=============================================================================="
+print_warn "   Ending stage 3: Zot is ready."
+print_warn ""
+print_warn "   Starting stage 4: Mission is to deploy business stacks"
+print_warn "=============================================================================="
+sleep 3
+
+print_ok "Deploying business stacks..."
 serviceCount=$(sudo docker service ls --format '{{.Name}}' | wc -l | awk '{print $1}')
-find ./stacks -name 'docker-compose.yml' -print0 | while IFS= read -r -d '' file; do
-    # Skip the registry and incoming stacks
-    if [[ $file == *"registry"* ]]; then
-        continue
-    fi
-    if [[ $file == *"incoming"* ]]; then
-        continue
-    fi
-    
+find ./stage4 -name 'docker-compose.yml' -print0 | while IFS= read -r -d '' file; do
     deploy "$file" "$(basename "$(dirname "$file")")"
 
     # If serviceCount < 10, which means this is a new cluster. Sleep 10 to slow down the deployment.

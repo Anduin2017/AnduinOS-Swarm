@@ -2,7 +2,7 @@ version: '3.3'
 
 services:
   docs:
-    image: hub.aiursoft.cn/anduin/anduinos-docs
+    image: anduin2019/anduinos-docs
     networks:
       - proxy_app
     deploy:
@@ -11,7 +11,7 @@ services:
         swarmpit.service.deployment.autoredeploy: 'true'
 
   home:
-    image: hub.aiursoft.cn/anduin/anduinos-home
+    image: anduin2019/anduinos-home
     networks:
       - proxy_app
     deploy:

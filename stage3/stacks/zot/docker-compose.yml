@@ -1,0 +1,39 @@
+version: '3.9'
+
+services:
+  server:
+    image: localhost:8080/box_starting/local_zot
+    volumes:
+      - zot-blob:/data
+      - zot-config:/config
+    networks:
+      - proxy_app
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+      update_config:
+        order: stop-first
+        delay: 60s
+
+volumes:
+  zot-blob:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/zot-data/blob
+  zot-config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/zot-data/config
+
+networks:
+  net:
+    driver: overlay
+  proxy_app:
+    external: true

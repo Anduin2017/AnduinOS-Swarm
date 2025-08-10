@@ -1,0 +1,6 @@
+stages:
+  - build
+
+dummy:
+  stage: build
+  script: echo "Hello, $CI_JOB_NAME!"
