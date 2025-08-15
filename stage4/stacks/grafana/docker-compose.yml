@@ -4,7 +4,7 @@ services:
   grafana:
     depends_on:
       - prometheus # Grafana needs to be using Prometheus as a data source
-    image: grafana/grafana
+    image: hub.aiursoft.cn/grafana/grafana
     volumes:
       - grafana-config:/etc/grafana
       - grafana-data:/var/lib/grafana

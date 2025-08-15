@@ -30,7 +30,7 @@ services:
         delay: 5s
 
   app-db:
-    image: mysql
+    image: hub.aiursoft.cn/mysql
     volumes:
       - db-data:/var/lib/mysql
     environment:
