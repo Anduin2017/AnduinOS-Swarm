@@ -7,10 +7,16 @@ services:
       - download-data:/data
     networks:
       - proxy_app
+    stop_grace_period: 20s
     deploy:
       replicas: 3
-      labels:
-        swarmpit.service.deployment.autoredeploy: 'true'
+      update_config:
+        delay: 5s
+        order: start-first
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
     entrypoint: ["sh", "-c", "/app/static --port 5000 --path /data --allow-directory-browsing"]
 
 volumes:

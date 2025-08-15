@@ -19,6 +19,7 @@ services:
     networks:
       - net
       - proxy_app
+    stop_grace_period: 20s
     deploy:
       resources:
         limits:
@@ -26,8 +27,7 @@ services:
           memory: 4G
       update_config:
         order: start-first
-      labels:
-        swarmpit.service.deployment.autoredeploy: 'true'
+        delay: 5s
 
   app-db:
     image: mysql
@@ -40,13 +40,15 @@ services:
       - MYSQL_PASSWORD=<app_password>
     networks:
       - net
+    stop_grace_period: 60s
     deploy:
+      update_config:
+        order: stop-first
+        delay: 60s
       resources:
         limits:
           cpus: '2'
           memory: 4G
-      labels:
-        swarmpit.service.deployment.autoredeploy: 'true'
 
 networks:
   net:

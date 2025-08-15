@@ -2,23 +2,30 @@ version: '3.3'
 
 services:
   docs:
-    image: anduin2019/anduinos-docs
+    image: hub.aiursoft.cn/anduin/anduinos-docs
     networks:
       - proxy_app
+    stop_grace_period: 20s
     deploy:
       replicas: 2
-      labels:
-        swarmpit.service.deployment.autoredeploy: 'true'
+      update_config:
+        delay: 5s
+        order: start-first
 
   home:
-    image: anduin2019/anduinos-home
+    image: hub.aiursoft.cn/anduin/anduinos-home
     networks:
       - proxy_app
+    stop_grace_period: 20s
     deploy:
       replicas: 2
-      labels:
-        swarmpit.service.deployment.autoredeploy: 'true'
-
+      update_config:
+        delay: 5s
+        order: start-first
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
 
 networks:
   proxy_app:
