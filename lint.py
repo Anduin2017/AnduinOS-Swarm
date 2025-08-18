@@ -74,7 +74,7 @@ def process_file(path: str):
             for e in errs:
                 print(f"      - {e}")
 
-def main(root='.'):
+def main(root='./stage4'):
     for dirpath, _, filenames in os.walk(root):
         for fn in filenames:
             if fn in ('docker-compose.yml', 'docker.compose.yml'):
@@ -82,5 +82,5 @@ def main(root='.'):
 
 
 if __name__ == '__main__':
-    root_dir = sys.argv[1] if len(sys.argv) > 1 else '.'
+    root_dir = sys.argv[1] if len(sys.argv) > 1 else './stage4'
     main(root_dir)

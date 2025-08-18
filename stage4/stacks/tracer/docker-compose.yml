@@ -2,15 +2,21 @@ version: '3.9'
 
 services:
   app:
-    image: aiursoft/tracer
+    image: hub.aiursoft.cn/aiursoft/tracer
     volumes:
       - tracer-data:/data
     networks:
       - proxy_app
+    stop_grace_period: 20s
     deploy:
       replicas: 3
-      labels:
-        swarmpit.service.deployment.autoredeploy: 'true'
+      update_config:
+        delay: 5s
+        order: start-first
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
 
 volumes:
   tracer-data:

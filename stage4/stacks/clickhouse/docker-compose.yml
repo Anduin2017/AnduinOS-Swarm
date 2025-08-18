@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   authentik_proxy:
-    image: ghcr.io/goauthentik/proxy:2025.6
+    image: hub.aiursoft.cn/ghcr.io/goauthentik/proxy:2025.6
     environment:
       AUTHENTIK_HOST: "https://auth.aiursoft.cn/"
       AUTHENTIK_INSECURE: "false"
@@ -20,7 +20,7 @@ services:
         delay: 5s
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: hub.aiursoft.cn/clickhouse/clickhouse-server:latest
     environment:
       - CLICKHOUSE_USER=default
       - CLICKHOUSE_PASSWORD=123456
