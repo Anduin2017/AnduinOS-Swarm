@@ -1,6 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-
 #==========================
 # Color
 #==========================
@@ -15,6 +14,17 @@ export INFO="${Blue}[ INFO ]${Font}"
 export OK="${Green}[  OK  ]${Font}"
 export ERROR="${Red}[FAILED]${Font}"
 export WARNING="${Yellow}[ WARN ]${Font}"
+
+#==========================
+# Argument Parsing
+#==========================
+STACK_FILTER=""
+# Use ${1:-} and ${2:-} to provide a default empty value if arguments are not set
+if [[ "${1:-}" == "--filter" ]] && [[ -n "${2:-}" ]]; then
+  STACK_FILTER="$2"
+  echo -e "${Green}[  OK  ]${Font} ${Blue} Running with filter, will only deploy stacks containing: '$STACK_FILTER'${Font}"
+  shift 2 # Consume the two arguments so they don't interfere with other parts of the script
+fi
 
 #==========================
 # Print Colorful Text
@@ -238,8 +248,8 @@ while IFS= read -r file; do
 done < <(find ./stage* -name 'docker-compose.yml' -type f)
 
 print_ok "Creating networks..."
-subnet_third_octet=133
-external_networks=$(find ./stage* -name 'docker-compose.yml' -type f | xargs yq eval '.networks | to_entries | .[] | select(.value.external == true) | .key' 2>/dev/null | sort | uniq | tr -d '\r')
+subnet_third_octet=233
+external_networks=$(find ./stage* -name 'docker-compose.yml' -type f | xargs yq eval '.networks | to_entries | .[] | select(.value.external == true) | .key' 2>/dev/null | sort | uniq)
 for network in $external_networks; do
   if [ "$network" == "---" ]; then
     continue
@@ -404,11 +414,21 @@ sleep 3
 
 print_ok "Deploying business stacks..."
 serviceCount=$(sudo docker service ls --format '{{.Name}}' | wc -l | awk '{print $1}')
-find ./stage4 -name 'docker-compose.yml' -print0 | while IFS= read -r -d '' file; do
-    deploy "$file" "$(basename "$(dirname "$file")")"
 
-    # If serviceCount < 10, which means this is a new cluster. Sleep 10 to slow down the deployment.
-    if [ $serviceCount -lt 10 ]; then
-        sleep 10
+find ./stage4 -name 'docker-compose.yml' -print0 | while IFS= read -r -d '' file; do
+    # Extract the stack name from the file path (e.g., ./stage4/gitlab/docker-compose.yml -> gitlab)
+    stack_name=$(basename "$(dirname "$file")")
+
+    # Check if a filter is active, and if the stack name matches the filter
+    if [ -z "$STACK_FILTER" ] || [[ "$stack_name" == *"$STACK_FILTER"* ]]; then
+        print_ok "Deploying stack: $stack_name"
+        deploy "$file" "$stack_name"
+
+        # If it's a new cluster, slow down the deployment to avoid overwhelming the system
+        if [ $serviceCount -lt 10 ]; then
+            sleep 10
+        fi
+    else
+        print_info "Skipping stack '$stack_name' due to filter."
     fi
 done
