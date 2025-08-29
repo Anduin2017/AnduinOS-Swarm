@@ -1,5 +1,4 @@
 {
-	email anduin@aiursoft.com
 	log {
 		format json
 		output file /data/caddy/logs/web.log {
@@ -10,10 +9,6 @@
 	}
 	servers :443 {
 		listener_wrappers {
-			proxy_protocol {
-				timeout 2s
-				allow 10.0.0.0/8
-			}
 			http_redirect
 			tls
 		}
