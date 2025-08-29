@@ -12,7 +12,7 @@
 		listener_wrappers {
 			proxy_protocol {
 				timeout 2s
-				allow 10.233.0.0/16
+				allow 10.0.0.0/8
 			}
 			http_redirect
 			tls
