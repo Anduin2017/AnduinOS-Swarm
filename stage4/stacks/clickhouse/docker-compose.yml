@@ -4,7 +4,7 @@ services:
   authentik_proxy:
     image: hub.aiursoft.com/ghcr.io/goauthentik/proxy:2025.8
     environment:
-      AUTHENTIK_HOST: "https://auth.aiursoft.cn/"
+      AUTHENTIK_HOST: "https://auth.aiursoft.com/"
       AUTHENTIK_INSECURE: "false"
       AUTHENTIK_TOKEN: "{{CLICKHOUSE_OUTPOST_TOKEN}}"
     stop_grace_period: 20s
