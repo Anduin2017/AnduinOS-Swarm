@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   app:
-    image: hub.aiursoft.cn/aiursoft/tracer
+    image: hub.aiursoft.com/aiursoft/tracer
     volumes:
       - tracer-data:/data
     networks:

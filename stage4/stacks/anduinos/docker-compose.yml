@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   docs:
-    image: hub.aiursoft.cn/anduin/anduinos-docs
+    image: hub.aiursoft.com/anduin/anduinos-docs
     networks:
       - proxy_app
     stop_grace_period: 20s
@@ -13,7 +13,7 @@ services:
         order: start-first
 
   home:
-    image: hub.aiursoft.cn/anduin/anduinos-home
+    image: hub.aiursoft.com/anduin/anduinos-home
     networks:
       - proxy_app
     stop_grace_period: 20s

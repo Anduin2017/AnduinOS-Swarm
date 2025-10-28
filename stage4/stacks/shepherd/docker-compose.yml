@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   app:
-    image: hub.aiursoft.cn/containrrr/shepherd
+    image: hub.aiursoft.com/containrrr/shepherd
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
