@@ -85,7 +85,11 @@ function init_docker_swarm() {
 
 function ensure_docker_ready() {
     # Install docker if not installed
-    apt list --installed | grep -q docker-ce || install_docker
+    if ! command -v docker >/dev/null; then
+        install_docker
+    else
+        print_ok "Docker is already installed."
+    fi
 
     # Init docker swarm if not initialized
     sudo docker info | grep -q "Swarm: active" || init_docker_swarm
@@ -95,7 +99,7 @@ function ensure_docker_ready() {
 }
 
 function ensure_packages_needed_ready() {
-    sudo DEBIAN_FRONTEND=noninteractive apt install -y wsdd valgrind curl wget apt-transport-https ca-certificates software-properties-common
+    sudo DEBIAN_FRONTEND=noninteractive apt install -y wsdd valgrind curl wget apt-transport-https ca-certificates
 
     # Install yq. (Run install_yq only if the /usr/bin/yq does not exist.)
     [ -f /usr/bin/yq ] || install_yq
@@ -127,6 +131,97 @@ function ensure_nvidia_gpu() {
     }
 }
 
+auto_swap_setup() {
+    if [ "$EUID" -ne 0 ]; then
+        print_error "This script must be run as root. Please try: sudo $0"
+        return 1
+    fi
+
+    local swap_file="/swapfile"
+    local ram_kb
+    ram_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
+    judge "Getting physical RAM size"
+    
+    local ram_bytes=$((ram_kb * 1024))
+    local ram_human
+    ram_human=$(numfmt --to=iec --suffix=B "${ram_bytes}")
+    print_info "Detected physical RAM size: $ram_human"
+
+    local current_swap_bytes=0
+    if [ -f "$swap_file" ]; then
+        current_swap_bytes=$(stat -c%s "$swap_file")
+    fi
+
+    # Compare sizes (allow 1% tolerance)
+    local tolerance=$((ram_bytes / 100))
+    local diff=$((ram_bytes - current_swap_bytes))
+    [ $diff -lt 0 ] && diff=$((diff * -1)) # absolute value
+
+    if [ "$diff" -lt "$tolerance" ]; then
+        print_ok "Swap file $swap_file already exists and has the correct size ($ram_human)."
+        if ! grep -q "^$swap_file" /proc/swaps; then
+            print_warn "Swap file is not active. Activating..."
+            swapon "$swap_file"
+            judge "Activating $swap_file"
+        fi
+        print_ok "Swap is already configured correctly."
+        return 0
+    fi
+
+    if [ "$current_swap_bytes" -gt 0 ]; then
+        local current_swap_human
+        current_swap_human=$(numfmt --to=iec --suffix=B "${current_swap_bytes}")
+        print_warn "Swap file size ($current_swap_human) does not match RAM ($ram_human)."
+    else
+        print_info "/swapfile not found."
+    fi
+    
+    print_info "Recreating $swap_file ..."
+
+    if grep -q "^$swap_file" /proc/swaps; then
+        print_info "Deactivating (swapoff) existing $swap_file..."
+        swapoff "$swap_file"
+        judge "Deactivating $swap_file"
+    fi
+
+    if [ -f "$swap_file" ]; then
+        print_info "Deleting old $swap_file..."
+        rm "$swap_file"
+        judge "Deleting old $swap_file"
+    fi
+
+    print_info "Allocating new $ram_human swap file..."
+    if ! fallocate -l "$ram_bytes" "$swap_file"; then
+        print_warn "fallocate failed. Falling back to dd (this may take a while)..."
+        dd if=/dev/zero of="$swap_file" bs=1K count="$ram_kb" status=progress
+        judge "Creating swap file with dd"
+    else
+        print_ok "File allocation successful."
+    fi
+
+    print_info "Setting permissions (chmod 600)..."
+    chmod 600 "$swap_file"
+    judge "Setting swap file permissions"
+
+    print_info "Formatting as swap (mkswap)..."
+    mkswap "$swap_file"
+    judge "Formatting swap file"
+
+    print_info "Activating new swap (swapon)..."
+    swapon "$swap_file"
+    judge "Activating swap file"
+
+    print_info "Updating /etc/fstab..."
+    sed -i '\%^/swapfile%d' /etc/fstab
+    if ! echo "$swap_file none swap sw 0 0" | tee -a /etc/fstab > /dev/null; then
+        print_error "Failed to automatically update /etc/fstab."
+        print_warn "You may need to manually add '$swap_file none swap sw 0 0' to /etc/fstab."
+        return 1
+    else
+        print_ok "/etc/fstab updated successfully."
+    fi
+}
+
 better_performance() {
     # Avoid system sleep (If gsettings command exists)
     if command -v gsettings &>/dev/null; then
@@ -150,6 +245,9 @@ better_performance() {
 
     print_ok "Setting system timezone to UTC..."
     sudo timedatectl set-timezone UTC
+
+    print_ok "Setting up swap file equal to physical RAM size..."
+    auto_swap_setup
 }
 
 function clean_up_docker() {

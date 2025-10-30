@@ -10,4 +10,7 @@ RUN if curl -f https://ftp.uni-stuttgart.de; then \
         apt update; \
     fi
 
+RUN rm /etc/apt/sources.list.d/ubuntu.sources || true
+RUN apt modernize-sources -y && rm /etc/apt/sources.list.bak
+
 RUN apt upgrade -y
