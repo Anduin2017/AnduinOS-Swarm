@@ -131,12 +131,8 @@ function ensure_nvidia_gpu() {
     }
 }
 
-auto_swap_setup() {
-    if [ "$EUID" -ne 0 ]; then
-        print_error "This script must be run as root. Please try: sudo $0"
-        return 1
-    fi
 
+auto_swap_setup() {
     local swap_file="/swapfile"
     local ram_kb
     ram_kb=$(grep MemTotal /proc/meminfo | awk '{print $2}')
@@ -149,7 +145,7 @@ auto_swap_setup() {
 
     local current_swap_bytes=0
     if [ -f "$swap_file" ]; then
-        current_swap_bytes=$(stat -c%s "$swap_file")
+        current_swap_bytes=$(sudo stat -c%s "$swap_file" 2>/dev/null || echo 0)
     fi
 
     # Compare sizes (allow 1% tolerance)
@@ -161,7 +157,7 @@ auto_swap_setup() {
         print_ok "Swap file $swap_file already exists and has the correct size ($ram_human)."
         if ! grep -q "^$swap_file" /proc/swaps; then
             print_warn "Swap file is not active. Activating..."
-            swapon "$swap_file"
+            sudo swapon "$swap_file"
             judge "Activating $swap_file"
         fi
         print_ok "Swap is already configured correctly."
@@ -180,40 +176,42 @@ auto_swap_setup() {
 
     if grep -q "^$swap_file" /proc/swaps; then
         print_info "Deactivating (swapoff) existing $swap_file..."
-        swapoff "$swap_file"
+        sudo swapoff "$swap_file"
         judge "Deactivating $swap_file"
     fi
 
     if [ -f "$swap_file" ]; then
         print_info "Deleting old $swap_file..."
-        rm "$swap_file"
+        sudo rm "$swap_file"
         judge "Deleting old $swap_file"
     fi
 
     print_info "Allocating new $ram_human swap file..."
-    if ! fallocate -l "$ram_bytes" "$swap_file"; then
+    if ! sudo fallocate -l "$ram_bytes" "$swap_file"; then
         print_warn "fallocate failed. Falling back to dd (this may take a while)..."
-        dd if=/dev/zero of="$swap_file" bs=1K count="$ram_kb" status=progress
+        sudo dd if=/dev/zero of="$swap_file" bs=1K count="$ram_kb" status=progress
         judge "Creating swap file with dd"
     else
         print_ok "File allocation successful."
     fi
 
     print_info "Setting permissions (chmod 600)..."
-    chmod 600 "$swap_file"
+    sudo chmod 600 "$swap_file"
     judge "Setting swap file permissions"
 
     print_info "Formatting as swap (mkswap)..."
-    mkswap "$swap_file"
+    sudo mkswap "$swap_file"
     judge "Formatting swap file"
 
     print_info "Activating new swap (swapon)..."
-    swapon "$swap_file"
+    sudo swapon "$swap_file"
     judge "Activating swap file"
 
     print_info "Updating /etc/fstab..."
-    sed -i '\%^/swapfile%d' /etc/fstab
-    if ! echo "$swap_file none swap sw 0 0" | tee -a /etc/fstab > /dev/null; then
+    sudo sed -i '\%^/swapfile%d' /etc/fstab
+    judge "Cleaning old swap entry from /etc/fstab"
+    
+    if ! echo "$swap_file none swap sw 0 0" | sudo tee -a /etc/fstab > /dev/null; then
         print_error "Failed to automatically update /etc/fstab."
         print_warn "You may need to manually add '$swap_file none swap sw 0 0' to /etc/fstab."
         return 1
