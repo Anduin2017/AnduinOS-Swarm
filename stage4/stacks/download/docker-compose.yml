@@ -2,7 +2,7 @@ version: '3.9'
 
 services:
   web:
-    image: hub.aiursoft.cn/aiursoft/static:latest
+    image: hub.aiursoft.com/aiursoft/static:latest
     volumes:
       - download-data:/data
     networks:

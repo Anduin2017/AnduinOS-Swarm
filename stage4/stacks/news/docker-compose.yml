@@ -4,7 +4,7 @@ services:
   app:
     depends_on:
       - app-db
-    image: hub.aiursoft.cn/aiursoft/moongladepure
+    image: hub.aiursoft.com/aiursoft/moongladepure
     volumes:
       - app-files:/data/files
       - app-aspnet:/data/.aspnet
@@ -13,7 +13,7 @@ services:
       - ConnectionStrings__DbType=MySql
       - Storage__Path=/data/files
       - AppSettings__AuthProvider=OIDC
-      - OIDC__Authority=https://auth.aiursoft.cn/application/o/anduinos-blog
+      - OIDC__Authority=https://auth.aiursoft.com/application/o/anduinos-blog
       - OIDC__ClientId={{ANDUINOS_BLOG_CLIENT_ID}}
       - OIDC__ClientSecret={{ANDUINOS_BLOG_CLIENT_SECRET}}
     networks:
@@ -30,7 +30,7 @@ services:
         delay: 5s
 
   app-db:
-    image: hub.aiursoft.cn/mysql
+    image: hub.aiursoft.com/mysql
     volumes:
       - db-data:/var/lib/mysql
     environment:
