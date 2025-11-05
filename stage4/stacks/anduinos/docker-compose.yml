@@ -15,7 +15,7 @@ services:
   app:
     depends_on:
       - db
-    image: hub.aiursoft.com/aiursoft/anduinos-home:latest
+    image: hub.aiursoft.com/anduin/anduinos-home:latest
     volumes:
       - anduinos-home-aspnet:/data/.aspnet/
       - anduinos-home-files:/data/files
