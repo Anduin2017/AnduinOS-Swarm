@@ -12,21 +12,77 @@ services:
         delay: 5s
         order: start-first
 
-  home:
-    image: hub.aiursoft.com/anduin/anduinos-home
+  app:
+    depends_on:
+      - db
+    image: hub.aiursoft.com/aiursoft/anduinos-home:latest
+    volumes:
+      - anduinos-home-aspnet:/data/.aspnet/
+      - anduinos-home-files:/data/files
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=db;Database=mth;Uid=mth;Pwd=<mth_password>;
+      - ConnectionStrings__DbType=MySql
+      - Storage__Path=/data/files
+      - AppSettings__AuthProvider=OIDC
+      - AppSettings__OIDC__Authority=https://auth.aiursoft.com/application/o/anduinos-home
+      - AppSettings__OIDC__ClientId={{AOH_CLIENT_ID}}
+      - AppSettings__OIDC__ClientSecret={{AOH_CLIENT_SECRET}}
     networks:
       - proxy_app
-    stop_grace_period: 20s
+      - internal
+    stop_grace_period: 60s
     deploy:
-      replicas: 2
-      update_config:
-        delay: 5s
-        order: start-first
       resources:
         limits:
-          cpus: '1'
+          cpus: "2.0"
           memory: 2G
+      update_config:
+        order: stop-first
+        delay: 60s
+
+  db:
+    image: hub.aiursoft.com/mysql
+    volumes:
+      - anduinos-home-db:/var/lib/mysql
+    environment:
+      - MYSQL_RANDOM_ROOT_PASSWORD=true
+      - MYSQL_DATABASE=mth
+      - MYSQL_USER=mth
+      - MYSQL_PASSWORD=<mth_password>
+    networks:
+      - internal
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+      update_config:
+        order: stop-first
+        delay: 60s
+
+volumes:
+  anduinos-home-files:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/anduinos-home-data/files
+  anduinos-home-aspnet:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/anduinos-home-data/aspnet
+  anduinos-home-db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/anduinos-home-data/mysql
 
 networks:
   proxy_app:
     external: true
+  internal:
+    driver: overlay
