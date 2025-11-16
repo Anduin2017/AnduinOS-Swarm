@@ -397,7 +397,7 @@ done
 print_warn "=============================================================================="
 print_warn "   Ending stage 2: Basic web infrastructure is ready."
 print_warn ""
-print_warn "   Starting stage 3: Mission is to build and start Authentik and Zot"
+print_warn "   Starting stage 3: Mission is to build and start Zot"
 print_warn "=============================================================================="
 sleep 3
 
@@ -405,25 +405,18 @@ print_ok "Building local zot..."
 sudo docker build ./stage3/images/zot -t localhost:8080/box_starting/local_zot:latest
 sudo docker push localhost:8080/box_starting/local_zot:latest
 
-print_ok "Starting Authentik and Zot..."
-deploy stage3/stacks/authentik/docker-compose.yml authentik
+print_ok "Starting Zot..."
 deploy stage3/stacks/zot/docker-compose.yml zot
-
-print_ok "Making sure the authentik is ready..."
-while curl -s https://auth.aiursoft.com > /dev/null; [ $? -ne 0 ]; do
-    print_warn "Waiting for authentik (https://auth.aiursoft.com) to start... ETA: 25s"
-    sleep 1
-done
 
 print_ok "Making sure the zot is ready..."
 sleep 5 # Could not trust result in the first few seconds, because the old zot might still be running
-while curl -s https://hub.aiursoft.com > /dev/null; [ $? -ne 0 ]; do
-    print_warn "Waiting for registry (https://hub.aiursoft.com) to start... ETA: 25s"
+while curl -s https://hub.anduinos.com > /dev/null; [ $? -ne 0 ]; do
+    print_warn "Waiting for registry (https://hub.anduinos.com) to start... ETA: 25s"
     sleep 1
 done
 
 print_warn "=============================================================================="
-print_warn "   Ending stage 3: Authentik and Zot are ready."
+print_warn "   Ending stage 3: Zot is ready."
 print_warn ""
 print_warn "   Starting stage 4: Mission is to deploy business stacks"
 print_warn "=============================================================================="
