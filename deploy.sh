@@ -374,9 +374,6 @@ mkdir -p ./stage2/images/sites/discovered && \
 print_ok "Building local ubuntu..."
 sudo docker build ./stage2/images/ubuntu   -t localhost:8080/box_starting/local_ubuntu:latest
 sudo docker push localhost:8080/box_starting/local_ubuntu:latest
-print_ok "Building local frp..."
-sudo docker build ./stage2/images/frp      -t localhost:8080/box_starting/local_frp:latest
-sudo docker push localhost:8080/box_starting/local_frp:latest
 print_ok "Building local caddy..."
 sudo docker build ./stage2/images/sites    -t localhost:8080/box_starting/local_sites:latest
 sudo docker push localhost:8080/box_starting/local_sites:latest
@@ -389,8 +386,8 @@ deploy stage2/stacks/incoming/docker-compose.yml incoming # 8080
 
 print_ok "Make sure the caddy is ready..."
 sleep 5 # Could not trust result in the first few seconds, because the old registry might still be running
-while curl -s http://test.aiursoft.com > /dev/null; [ $? -ne 0 ]; do
-    print_warn "Waiting for caddy (http://test.aiursoft.com) to start... ETA: 25s"
+while curl -s http://test.anduinos.com > /dev/null; [ $? -ne 0 ]; do
+    print_warn "Waiting for caddy (http://test.anduinos.com) to start... ETA: 25s"
     sleep 1
 done
 
