@@ -4,7 +4,7 @@ services:
   app:
     depends_on:
       - app-db
-    image: hub.aiursoft.com/aiursoft/moongladepure
+    image: aiursoft/moongladepure
     volumes:
       - app-files:/data/files
       - app-aspnet:/data/.aspnet
@@ -30,7 +30,7 @@ services:
         delay: 5s
 
   app-db:
-    image: hub.aiursoft.com/mysql
+    image: mysql
     volumes:
       - db-data:/var/lib/mysql
     environment:
