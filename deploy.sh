@@ -244,6 +244,13 @@ better_performance
 print_ok "Cleaning up docker (if no stack deployed)..."
 clean_up_docker
 
+print_ok "Deleting zombie vxlan interfaces..."
+for interface in $(ip -d link show | grep vx | grep DOWN | awk -F': ' '{print $2}'); do
+  echo "Deleting zombie interface: $interface"
+  sudo ip link delete $interface
+done
+judge "Deleting zombie vxlan interfaces"
+
 print_ok "Creating secrets..."
 while IFS= read -r file; do
   while IFS= read -r secret_name; do
