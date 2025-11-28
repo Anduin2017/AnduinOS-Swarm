@@ -21,6 +21,10 @@ services:
 volumes:
   tracer-data:
     driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/tracer/
 
 networks:
   proxy_app:
