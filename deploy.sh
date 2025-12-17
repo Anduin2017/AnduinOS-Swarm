@@ -159,6 +159,131 @@ better_performance() {
     curl -s https://gitlab.aiursoft.com/anduin/init-server/-/raw/master/autoswap.sh?ref_type=heads | sudo bash
 }
 
+function setup_docker_auto_clean() {
+    print_info "Configuring Docker Disk Auto-Cleanup (Idempotent)..."
+    
+    local NEED_RELOAD=0
+    local MONITOR_PATH="/usr/local/bin/docker-disk-monitor.sh"
+    local SERVICE_PATH="/etc/systemd/system/docker-disk-monitor.service"
+    local TIMER_PATH="/etc/systemd/system/docker-disk-monitor.timer"
+
+    # ==========================================
+    # 1. Define and Check Monitor Script
+    # ==========================================
+    # Logic: > 500GB (512000MB) Prune -> If > 450GB (460800MB) Warn
+    cat << 'EOF' > /tmp/docker-disk-monitor.sh.tmp
+#!/bin/bash
+set -euo pipefail
+
+TRIGGER_MB=512000
+SAFE_MB=460800
+DOCKER_DIR="/var/lib/docker"
+MOTD_FILE="/etc/motd"
+WARN_MSG="[CRITICAL] Docker disk usage is extremely high (>450GB). Please check."
+
+# Get size in MB
+CURRENT_SIZE=$(du -xsm "$DOCKER_DIR" | cut -f1)
+
+if [ "$CURRENT_SIZE" -gt "$TRIGGER_MB" ]; then
+    echo "Usage (${CURRENT_SIZE}MB) > Limit (${TRIGGER_MB}MB). Pruning..."
+    docker system prune -a --volumes -f
+
+    NEW_SIZE=$(du -xsm "$DOCKER_DIR" | cut -f1)
+    
+    if [ "$NEW_SIZE" -gt "$SAFE_MB" ]; then
+        echo "Still high after prune: ${NEW_SIZE}MB."
+        # Add warning to MOTD if not present
+        if ! grep -Fxq "$WARN_MSG" "$MOTD_FILE"; then
+            echo -e "\n\033[31m$WARN_MSG\033[0m" >> "$MOTD_FILE"
+        fi
+    else
+        echo "Cleaned up. Now: ${NEW_SIZE}MB."
+        # Self-healing: Remove warning from MOTD if space is safe
+        sed -i "/\[CRITICAL\] Docker disk usage/d" "$MOTD_FILE"
+    fi
+else
+    # Self-healing: Remove warning from MOTD if space is safe
+    sed -i "/\[CRITICAL\] Docker disk usage/d" "$MOTD_FILE"
+fi
+EOF
+
+    # Idempotency Check: Only move if different
+    if [ ! -f "$MONITOR_PATH" ] || ! cmp -s /tmp/docker-disk-monitor.sh.tmp "$MONITOR_PATH"; then
+        print_warn "Monitor script changed or missing. Updating..."
+        sudo mv /tmp/docker-disk-monitor.sh.tmp "$MONITOR_PATH"
+        sudo chmod +x "$MONITOR_PATH"
+    else
+        rm /tmp/docker-disk-monitor.sh.tmp
+        print_ok "Monitor script is up-to-date."
+    fi
+
+    # ==========================================
+    # 2. Define and Check Service
+    # ==========================================
+    cat << EOF > /tmp/docker-disk-monitor.service.tmp
+[Unit]
+Description=Check Docker disk usage and prune if necessary
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=$MONITOR_PATH
+User=root
+EOF
+
+    if [ ! -f "$SERVICE_PATH" ] || ! cmp -s /tmp/docker-disk-monitor.service.tmp "$SERVICE_PATH"; then
+        print_warn "Service config changed. Updating..."
+        sudo mv /tmp/docker-disk-monitor.service.tmp "$SERVICE_PATH"
+        NEED_RELOAD=1
+    else
+        rm /tmp/docker-disk-monitor.service.tmp
+        print_ok "Service config is up-to-date."
+    fi
+
+    # ==========================================
+    # 3. Define and Check Timer (15 mins)
+    # ==========================================
+    cat << EOF > /tmp/docker-disk-monitor.timer.tmp
+[Unit]
+Description=Run Docker disk monitor every 15 minutes
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=15min
+Unit=docker-disk-monitor.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    if [ ! -f "$TIMER_PATH" ] || ! cmp -s /tmp/docker-disk-monitor.timer.tmp "$TIMER_PATH"; then
+        print_warn "Timer config changed. Updating..."
+        sudo mv /tmp/docker-disk-monitor.timer.tmp "$TIMER_PATH"
+        NEED_RELOAD=1
+    else
+        rm /tmp/docker-disk-monitor.timer.tmp
+        print_ok "Timer config is up-to-date."
+    fi
+
+    # ==========================================
+    # 4. Apply Changes
+    # ==========================================
+    if [ "$NEED_RELOAD" -eq 1 ]; then
+        print_warn "Systemd configuration changed. Reloading..."
+        sudo systemctl daemon-reload
+    fi
+
+    # Always ensure it is enabled and running
+    if ! sudo systemctl is-active --quiet docker-disk-monitor.timer; then
+        print_warn "Enabling Docker Monitor Timer..."
+        sudo systemctl enable --now docker-disk-monitor.timer
+        judge "Enable Docker Monitor"
+    else
+        print_ok "Docker Monitor Timer is running."
+    fi
+}
+
 function clean_up_docker() {
     # if there is no stack deployed, run the system prune command
     # else, log and skip cleaning.
@@ -240,6 +365,10 @@ fi
 # Tuning for better performance
 print_ok "Tuning for better performance..."
 better_performance
+
+# Setup docker auto clean
+print_ok "Setting up docker auto clean..."
+setup_docker_auto_clean
 
 print_ok "Cleaning up docker (if no stack deployed)..."
 clean_up_docker
