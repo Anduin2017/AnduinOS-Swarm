@@ -24,6 +24,8 @@ services:
     environment:
       - CLICKHOUSE_USER=default
       - CLICKHOUSE_PASSWORD=123456
+      - CLICKHOUSE_TELEMETRY_OPT_OUT=1 
+      - CLICKHOUSE_DO_NOT_CHECK_UPDATES=1
     networks:
       - proxy_app
       - clickhouse_net

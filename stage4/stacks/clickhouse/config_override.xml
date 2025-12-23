@@ -1,8 +1,16 @@
 <clickhouse>
     <logger>
-        <level>information</level>
+        <level>warning</level>
+        <console>1</console>
     </logger>
-    <text_log>
-        <level>information</level>
-    </text_log>
+    <query_log remove="1"/>
+    <query_thread_log remove="1"/>
+    <part_log remove="1"/>
+    <trace_log remove="1"/>
+    <metric_log remove="1"/>
+    <asynchronous_metric_log remove="1"/>
+    <session_log remove="1"/>
+    <text_log remove="1"/>
+    <crash_dump_size_limit>0</crash_dump_size_limit>
+    <max_server_memory_usage_to_ram_ratio>0.9</max_server_memory_usage_to_ram_ratio>
 </clickhouse>
