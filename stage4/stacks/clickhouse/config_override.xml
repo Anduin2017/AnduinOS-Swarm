@@ -1,0 +1,8 @@
+<clickhouse>
+    <logger>
+        <level>information</level>
+    </logger>
+    <text_log>
+        <level>information</level>
+    </text_log>
+</clickhouse>
