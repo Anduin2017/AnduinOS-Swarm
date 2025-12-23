@@ -557,7 +557,8 @@ sleep 3
 
 # /swarm-vol/click-house/config_override.xml
 print_ok "Copying ClickHouse config override file..."
-sudo cp ./stage4/stacks/clickhouse/config_override.xml /swarm-vol/click-house/config_override.xml
+sudo cp ./stage4/stacks/clickhouse/users_override.xml /swarm-vol/click-house/users_override.xml || true
+sudo cp ./stage4/stacks/clickhouse/config_override.xml /swarm-vol/click-house/config_override.xml || true
 judge "Copying ClickHouse config override file"
 
 print_ok "Deploying business stacks..."

@@ -30,6 +30,7 @@ services:
     volumes:
       - click-house-data:/var/lib/clickhouse
       - /swarm-vol/click-house/config_override.xml:/etc/clickhouse-server/config.d/config_override.xml
+      - /swarm-vol/click-house/users_override.xml:/etc/clickhouse-server/users.d/users_override.xml
     stop_grace_period: 60s
     deploy:
       resources:
