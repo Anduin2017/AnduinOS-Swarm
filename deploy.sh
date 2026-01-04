@@ -491,7 +491,6 @@ sleep 3
 rm -rf ./stage2/images/sites/discovered
 mkdir -p ./stage2/images/sites/discovered && \
     cp ./stage2/stacks/**/*.conf ./stage2/images/sites/discovered && \
-    cp ./stage3/stacks/**/*.conf ./stage2/images/sites/discovered && \
     cp ./stage4/stacks/**/*.conf ./stage2/images/sites/discovered
 
 print_ok "Building local ubuntu..."
@@ -516,27 +515,6 @@ done
 
 print_warn "=============================================================================="
 print_warn "   Ending stage 2: Basic web infrastructure is ready."
-print_warn ""
-print_warn "   Starting stage 3: Mission is to build and start Zot"
-print_warn "=============================================================================="
-sleep 3
-
-print_ok "Building local zot..."
-sudo docker build ./stage3/images/zot -t localhost:8080/box_starting/local_zot:latest
-sudo docker push localhost:8080/box_starting/local_zot:latest
-
-print_ok "Starting Zot..."
-deploy stage3/stacks/zot/docker-compose.yml zot
-
-print_ok "Making sure the zot is ready..."
-sleep 5 # Could not trust result in the first few seconds, because the old zot might still be running
-while curl -s https://hub.anduinos.com > /dev/null; [ $? -ne 0 ]; do
-    print_warn "Waiting for registry (https://hub.anduinos.com) to start... ETA: 25s"
-    sleep 1
-done
-
-print_warn "=============================================================================="
-print_warn "   Ending stage 3: Zot is ready."
 print_warn ""
 print_warn "   Starting stage 4: Mission is to deploy business stacks"
 print_warn "=============================================================================="
