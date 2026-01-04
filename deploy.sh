@@ -73,24 +73,11 @@ function install_yq() {
     sudo chmod +x /usr/bin/yq
 }
 
-function install_docker() {
-    curl -fsSL get.docker.com -o get-docker.sh
-    CHANNEL=stable sh get-docker.sh
-    rm get-docker.sh
-}
-
 function init_docker_swarm() {
     sudo docker swarm init --advertise-addr $(hostname -I | awk '{print $1}')
 }
 
 function ensure_docker_ready() {
-    # Install docker if not installed
-    if ! command -v docker >/dev/null; then
-        install_docker
-    else
-        print_ok "Docker is already installed."
-    fi
-
     # Init docker swarm if not initialized
     sudo docker info | grep -q "Swarm: active" || init_docker_swarm
 
@@ -99,7 +86,7 @@ function ensure_docker_ready() {
 }
 
 function ensure_packages_needed_ready() {
-    sudo DEBIAN_FRONTEND=noninteractive apt install -y wsdd valgrind curl wget apt-transport-https ca-certificates docker-compose-plugin
+    sudo DEBIAN_FRONTEND=noninteractive apt install -y wsdd valgrind curl wget apt-transport-https ca-certificates docker-compose-plugin docker.io
 
     # Install yq. (Run install_yq only if the /usr/bin/yq does not exist.)
     [ -f /usr/bin/yq ] || install_yq
