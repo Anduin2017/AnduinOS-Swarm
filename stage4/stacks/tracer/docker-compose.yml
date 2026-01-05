@@ -2,30 +2,76 @@ version: '3.9'
 
 services:
   app:
+    depends_on:
+      - db
     image: aiursoft/tracer
     volumes:
-      - tracer-data:/data
+      - tracer-aspnet:/data/.aspnet/
+      - tracer-files:/data/files
+    environment:
+      - ConnectionStrings__DefaultConnection=Server=db;Database=mth;Uid=mth;Pwd=<mth_password>;
+      - ConnectionStrings__DbType=MySql
+      - Storage__Path=/data/files
+      - AppSettings__AuthProvider=OIDC
+      - AppSettings__OIDC__Authority=https://auth.aiursoft.com/application/o/tracer
+      - AppSettings__OIDC__ClientId={{TRACER_CLIENT_ID}}
+      - AppSettings__OIDC__ClientSecret={{TRACER_CLIENT_SECRET}}
     networks:
       - proxy_app
-    stop_grace_period: 20s
+      - internal
+    stop_grace_period: 60s
     deploy:
-      replicas: 3
-      update_config:
-        delay: 5s
-        order: start-first
       resources:
         limits:
-          cpus: '1'
-          memory: 1G
+          cpus: '2.0'
+          memory: 2G
+      update_config:
+        order: stop-first
+        delay: 60s
+
+  db:
+    image: mysql
+    volumes:
+      - tracer-db:/var/lib/mysql
+    environment:
+      - MYSQL_RANDOM_ROOT_PASSWORD=true
+      - MYSQL_DATABASE=mth
+      - MYSQL_USER=mth
+      - MYSQL_PASSWORD=<mth_password>
+    networks:
+      - internal
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+      update_config:
+        order: stop-first
+        delay: 60s
 
 volumes:
-  tracer-data:
+  tracer-files:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /swarm-vol/tracer/
+      device: /swarm-vol/tracer-data/files
+  tracer-aspnet:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/tracer-data/aspnet
+  tracer-db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/tracer-data/mysql
 
 networks:
   proxy_app:
     external: true
+  internal:
+    driver: overlay
