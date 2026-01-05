@@ -13,7 +13,7 @@ services:
       - ConnectionStrings__DbType=MySql
       - Storage__Path=/data/files
       - AppSettings__AuthProvider=OIDC
-      - AppSettings__OIDC__Authority=https://auth.aiursoft.com/application/o/tracer
+      - AppSettings__OIDC__Authority=https://auth.aiursoft.com/application/o/server-latency-test-poland
       - AppSettings__OIDC__ClientId={{TRACER_CLIENT_ID}}
       - AppSettings__OIDC__ClientSecret={{TRACER_CLIENT_SECRET}}
     networks:
