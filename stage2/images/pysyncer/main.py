@@ -33,7 +33,7 @@ COLUMNS = [
     'ts', 'level', 'logger', 'msg',
     'remote_ip', 'remote_port', 'method', 'host', 'uri',
     'status', 'duration_ms', 'bytes_sent',
-    'user_agent', 'err_id', 'err_trace'
+    'user_agent', 'country', 'err_id', 'err_trace'
 ]
 
 # Shutdown event
@@ -136,6 +136,7 @@ def transform(rec):
         float(duration_ms),
         int(rec.get('size', rec.get('bytes_sent', 0)) or 0),
         str(extract_first(headers, 'User-Agent')),
+        str(extract_first(headers, 'Cf-Ipcountry')),  # Country code from Cloudflare
         str(rec.get('err_id', '')),
         str(rec.get('err_trace', ''))
     )

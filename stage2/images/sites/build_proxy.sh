@@ -20,7 +20,7 @@ done
 echo "Building sites under $(pwd)..."
 find . -type f -name "*.conf" ! -name "cloudflare_ips.conf" | while read -r file; do cat "$file"; echo -e "\n\n"; done | tee ./Dist/Sites.temp > /dev/null
 
-echo "Appending baseline and cloudflare IPs..."
+echo "Appending cloudflare ips, baseline and business sites into final Caddyfile..."
 (cat ./cloudflare_ips.conf; echo -e "\n\n"; cat ./baseline; echo -e "\n\n"; cat ./Dist/Sites.temp) | tee ./Dist/Caddyfile > /dev/null
 
 echo "Caddyfile built."
