@@ -14,9 +14,9 @@ WORKDIR /app
 # Install curl for fetching Cloudflare IPs and openssl for generating dummy certs
 # Also download Cloudflare Origin Pull CA certificate for mTLS verification
 RUN apt-get update && \
-    apt-get install -y curl openssl && \
+    apt-get install -y curl openssl ca-certificates && \
     mkdir -p /app/Dist/certs && \
-    curl -o /app/Dist/certs/origin-pull-ca.pem https://developers.cloudflare.com/ssl/static/origin-pull-ca.pem && \
+    curl -fsSL -o /app/Dist/certs/origin-pull-ca.pem https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem && \
     rm -rf /var/lib/apt/lists/*
 
 COPY . .

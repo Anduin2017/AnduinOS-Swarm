@@ -33,7 +33,7 @@ cat > ./cloudflare_ips.conf << EOF
 	tls {
 		client_auth {
 			mode require_and_verify
-			trusted_ca_cert_file /data/caddy/certs/origin-pull-ca.pem
+			trust_pool file /data/caddy/certs/origin-pull-ca.pem
 		}
 	}
 }
