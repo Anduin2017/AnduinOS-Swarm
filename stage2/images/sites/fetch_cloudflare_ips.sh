@@ -32,7 +32,7 @@ cat > ./cloudflare_ips.conf << EOF
 	tls /data/caddy/certs/anduinos.pem /data/caddy/certs/anduinos.key {
 		client_auth {
 			mode require_and_verify
-			trust_pool file /data/caddy/certs/origin-pull-ca.pem
+			trust_pool file /etc/caddy/origin-pull-ca.pem
 		}
 	}
 }

@@ -48,8 +48,8 @@ COPY --from=config-build-env /app/Dist/Caddyfile /etc/caddy/Caddyfile
 COPY --from=config-build-env /app/Dist/certs/anduinos.pem /data/caddy/certs/anduinos.pem
 COPY --from=config-build-env /app/Dist/certs/anduinos.key /data/caddy/certs/anduinos.key
 
-# Copy Cloudflare Origin Pull CA certificate for mTLS verification
-COPY --from=config-build-env /app/Dist/certs/origin-pull-ca.pem /data/caddy/certs/origin-pull-ca.pem
+# Copy Cloudflare Origin Pull CA certificate to /etc/caddy (safe from volume mount)
+COPY --from=config-build-env /app/Dist/certs/origin-pull-ca.pem /etc/caddy/origin-pull-ca.pem
 
 # Now we can safely validate the Caddyfile with dummy certificates in place
 RUN caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && \
