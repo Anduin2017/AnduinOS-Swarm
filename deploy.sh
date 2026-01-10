@@ -508,7 +508,7 @@ deploy stage2/stacks/incoming/docker-compose.yml incoming # 8080
 
 print_ok "Make sure the caddy is ready..."
 sleep 5 # Could not trust result in the first few seconds, because the old registry might still be running
-while curl -s https://test.anduinos.com > /dev/null; [ $? -ne 0 ]; do
+while [ "$(curl -s -o /dev/null -w "%{http_code}" https://test.anduinos.com)" != "200" ]; do
     print_warn "Waiting for caddy (https://test.anduinos.com) to start... ETA: 25s"
     sleep 1
 done
