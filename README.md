@@ -305,10 +305,10 @@ echo "  Total ranges: $(echo $ALL_RANGES | wc -w)"
 }
 ```
 
-它的作用是之后我们在 baseline 里引用的，其中 `(limit_to_cloudflare)` 包含：
+它的作用是之后我们在 baseline 里引用的，其中 `(limit_to_cloudflare)` 引用了两张证书：
 
-* 强制 mTLS 验证（验证 Cloudflare 证书，只有 Cloudflare 能发起请求）
-* 使用 Cloudflare 证书返回，从而让 Cloudflare 信任 Caddy。
+* `/data/caddy/certs/anduinos.key`。这张证书是 Cloudflare 下发的，用来给 Caddy 作响应使用的。显然，在这里证书还是假的，真正的证书会在运行时通过 Docker Volume 分发给 Caddy。暂且不管这张证书，继续配置。
+* `/etc/caddy/origin-pull-ca.pem`。这张证书是 Cloudflare 的公钥，用来验证 Cloudflare 发起请求时携带的证书是否合法。只要验证通过，Caddy 才会继续处理请求。这样就实现了 **Authenticated Origin Pulls**，即只有 Cloudflare 能访问 Caddy。
 
 双向验证完成后，即可开启最严格的 Full Strict 模式。
 
