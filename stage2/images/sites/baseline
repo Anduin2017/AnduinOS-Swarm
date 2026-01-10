@@ -7,16 +7,14 @@
 		}
 		level debug
 	}
+}
 
-	servers {
-		import cloudflare_ip_ranges
-	}
-
-	servers :443 {
-		listener_wrappers {
-			http_redirect
-			tls
-		}
+servers :443 {
+	import cloudflare_trust
+	
+	listener_wrappers {
+		http_redirect
+		tls
 	}
 }
 

@@ -18,21 +18,24 @@ echo "Generating cloudflare_ips.conf..."
 
 # Generate the configuration file
 cat > ./cloudflare_ips.conf << EOF
-# Auto-generated Cloudflare IP configuration
+# Auto-generated Cloudflare Configuration
 # Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 # Source: https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6
 
-# Define cloudflare_ip_ranges snippet for trusted_proxies
-(cloudflare_ip_ranges) {
+# 1. Trust proxy configuration (for restoring real client IPs)
+(cloudflare_trust) {
 	trusted_proxies static $ALL_RANGES
 }
 
-# Define limit_to_cloudflare snippet for access control
+# 2. Security verification using mTLS (replaces IP whitelist)
+# Any site importing this snippet must pass Cloudflare certificate verification
 (limit_to_cloudflare) {
-	@denied {
-		not remote_ip $ALL_RANGES
+	tls {
+		client_auth {
+			mode require_and_verify
+			trusted_ca_cert_file /data/caddy/certs/origin-pull-ca.pem
+		}
 	}
-	abort @denied
 }
 EOF
 

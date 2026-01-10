@@ -12,8 +12,11 @@ FROM localhost:8080/box_starting/local_ubuntu AS config-build-env
 WORKDIR /app
 
 # Install curl for fetching Cloudflare IPs and openssl for generating dummy certs
+# Also download Cloudflare Origin Pull CA certificate for mTLS verification
 RUN apt-get update && \
     apt-get install -y curl openssl && \
+    mkdir -p /app/Dist/certs && \
+    curl -o /app/Dist/certs/origin-pull-ca.pem https://developers.cloudflare.com/ssl/static/origin-pull-ca.pem && \
     rm -rf /var/lib/apt/lists/*
 
 COPY . .
@@ -24,8 +27,7 @@ RUN /bin/bash /app/build_proxy.sh
 
 # Generate dummy certificates for build-time validation
 # These will be replaced by real certificates at runtime via Docker volumes
-RUN mkdir -p /app/Dist/certs && \
-    openssl req -x509 -newkey rsa:2048 -nodes \
+RUN openssl req -x509 -newkey rsa:2048 -nodes \
     -keyout /app/Dist/certs/anduinos.key \
     -out /app/Dist/certs/anduinos.pem \
     -days 1 -subj "/CN=localhost"
@@ -45,6 +47,9 @@ COPY --from=config-build-env /app/Dist/Caddyfile /etc/caddy/Caddyfile
 # Note: These will be replaced by real certificates at runtime via Docker volumes
 COPY --from=config-build-env /app/Dist/certs/anduinos.pem /data/caddy/certs/anduinos.pem
 COPY --from=config-build-env /app/Dist/certs/anduinos.key /data/caddy/certs/anduinos.key
+
+# Copy Cloudflare Origin Pull CA certificate for mTLS verification
+COPY --from=config-build-env /app/Dist/certs/origin-pull-ca.pem /data/caddy/certs/origin-pull-ca.pem
 
 # Now we can safely validate the Caddyfile with dummy certificates in place
 RUN caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && \
