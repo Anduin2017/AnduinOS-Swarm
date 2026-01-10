@@ -8,6 +8,11 @@ echo "Fetching Cloudflare IP ranges..."
 chmod +x ./fetch_cloudflare_ips.sh
 ./fetch_cloudflare_ips.sh
 
+# Automatically remove explicit TLS lines from conf files
+# Certificate loading is now unified in the limit_to_cloudflare snippet
+echo "Removing explicit TLS lines from conf files (moved to snippet)..."
+find . -type f -name '*.conf' ! -name 'cloudflare_ips.conf' -exec sed -i '/tls \/data\/caddy\/certs\/anduinos.pem/d' {} +
+
 echo "Adding empty lines to the end of files without a newline..."
 find . -type f -name '*.conf' ! -name 'cloudflare_ips.conf' | while read -r file; do
     last_line=$(tail -n 1 "$file")

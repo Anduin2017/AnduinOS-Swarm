@@ -20,17 +20,16 @@ echo "Generating cloudflare_ips.conf..."
 cat > ./cloudflare_ips.conf << EOF
 # Auto-generated Cloudflare Configuration
 # Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-# Source: https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6
 
-# 1. Trust proxy configuration (for restoring real client IPs)
+# 1. Trust proxy configuration
 (cloudflare_trust) {
 	trusted_proxies static $ALL_RANGES
 }
 
-# 2. Security verification using mTLS (replaces IP whitelist)
-# Any site importing this snippet must pass Cloudflare certificate verification
+# 2. Security & TLS Configuration
+# This snippet handles both: certificate loading + mTLS verification
 (limit_to_cloudflare) {
-	tls {
+	tls /data/caddy/certs/anduinos.pem /data/caddy/certs/anduinos.key {
 		client_auth {
 			mode require_and_verify
 			trust_pool file /data/caddy/certs/origin-pull-ca.pem
