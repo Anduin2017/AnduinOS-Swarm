@@ -7,6 +7,14 @@
 		}
 		level debug
 	}
+
+	servers {
+		trusted_proxies cloudflare {
+			interval 12h
+			timeout 15s
+		}
+	}
+
 	servers :443 {
 		listener_wrappers {
 			http_redirect

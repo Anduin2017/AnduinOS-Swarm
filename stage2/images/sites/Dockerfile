@@ -5,7 +5,8 @@ FROM localhost:8080/public_mirror/caddy:builder AS caddy-build-env
 RUN xcaddy build \
     --with github.com/ueffel/caddy-brotli \
     --with github.com/caddyserver/transform-encoder \
-    --with github.com/mholt/caddy-ratelimit
+    --with github.com/mholt/caddy-ratelimit \
+    --with github.com/WeidiDeng/caddy-cloudflare-ip
 
 # ============================
 # Prepare Caddyfile build Environment
