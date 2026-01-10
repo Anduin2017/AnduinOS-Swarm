@@ -126,7 +126,8 @@ def transform(rec):
         str(rec.get('level', '')),
         str(rec.get('logger', '')),
         str(rec.get('msg', '')),
-        str(request.get('remote_ip', '')),
+        # Prioritize client_ip (real IP resolved by trusted_proxies) over remote_ip (Cloudflare node IP)
+        str(request.get('client_ip') or request.get('remote_ip', '')),
         int(request.get('remote_port', 0) or 0),
         str(request.get('method', '')),
         str(request.get('host', '')),
