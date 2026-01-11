@@ -40,7 +40,9 @@ COPY --from=config-build-env /app/Dist/Caddyfile /etc/caddy/Caddyfile
 
 
 # Now we can safely validate the Caddyfile with dummy certificates in place
-RUN caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && \
+# We inject a dummy token here just to pass the validation check during build.
+# The real token will be provided at runtime via Docker Service environment variables.
+RUN CLOUDFLARE_API_TOKEN=validation_dummy_token caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && \
     mkdir -p /var/log/caddy /data/caddy/logs && \
     touch /data/caddy/logs/web.log
 
