@@ -19,14 +19,7 @@ services:
           # Network aliases for internal DNS resolution
           # Allows internal services to resolve these domains directly to Caddy
           # without needing to go through Cloudflare or modify /etc/hosts
-          - clickhouse.anduinos.com
-          - docs.anduinos.com
-          - download.anduinos.com
-          - grafana.anduinos.com
-          - news.anduinos.com
-          - test.anduinos.com
-          - tracer.anduinos.com
-          - www.anduinos.com
+          ---DOMAINS---
     environment:
       # Cloudflare API token for Let's Encrypt DNS-01 challenge
       # Create token at: Cloudflare Dashboard -> My Profile -> API Tokens

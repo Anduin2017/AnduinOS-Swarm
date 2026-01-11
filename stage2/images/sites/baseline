@@ -1,4 +1,10 @@
 {
+	# Email for Let's Encrypt notifications (certificate expiration, etc.)
+	email anduin@aiursoft.com
+	
+	# Global ACME configuration for Let's Encrypt DNS-01 challenge
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
 	log {
 		format json
 		output file /data/caddy/logs/web.log {

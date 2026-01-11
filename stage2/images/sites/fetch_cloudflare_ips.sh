@@ -26,15 +26,15 @@ cat > ./cloudflare_ips.conf << EOF
 	trusted_proxies static $ALL_RANGES
 }
 
-# 2. Security & TLS Configuration
-# This snippet handles both: certificate loading + mTLS verification
+# 2. IP-based Access Control
+# Allow traffic from Cloudflare IPs and Docker internal networks only
 (limit_to_cloudflare) {
-	tls /data/caddy/certs/anduinos.pem /data/caddy/certs/anduinos.key {
-		client_auth {
-			mode require_and_verify
-			trust_pool file /etc/caddy/origin-pull-ca.pem
-		}
+	@allowed_traffic {
+		remote_ip forwarded
+		remote_ip private_ranges
 	}
+	
+	abort not @allowed_traffic
 }
 EOF
 

@@ -503,6 +503,29 @@ print_ok "Building local pysyncer..."
 sudo docker build ./stage2/images/pysyncer    -t localhost:8080/box_starting/local_pysyncer:latest
 sudo docker push localhost:8080/box_starting/local_pysyncer:latest
 
+print_ok "Cleaning old docker-compose.yml..."
+rm -f ./stage2/stacks/incoming/docker-compose.yml
+
+print_ok "Generating docker-compose.yml with auto-discovered domains..."
+bash ./stage2/stacks/incoming/generate_compose.sh
+judge "Generate docker-compose.yml"
+
+# Pre-flight check: Ensure CLOUDFLARE_API_TOKEN is available
+if grep -q "{{CLOUDFLARE_API_TOKEN}}" ./stage2/stacks/incoming/docker-compose.yml; then
+    if [ -z "$ENV_FILE" ]; then
+        print_error "CLOUDFLARE_API_TOKEN placeholder found but no .env file exists!"
+        print_error "Caddy needs this token to solve DNS-01 challenge for Let's Encrypt."
+        exit 1
+    elif ! grep -q "^CLOUDFLARE_API_TOKEN=" "$ENV_FILE"; then
+        print_error "CLOUDFLARE_API_TOKEN is missing in $ENV_FILE!"
+        print_error "Caddy needs this token to solve DNS-01 challenge for Let's Encrypt."
+        print_error "Please add: CLOUDFLARE_API_TOKEN=your_token_here"
+        exit 1
+    else
+        print_ok "CLOUDFLARE_API_TOKEN found in $ENV_FILE"
+    fi
+fi
+
 print_ok "Starting incoming proxy..."
 deploy stage2/stacks/incoming/docker-compose.yml incoming # 8080
 
