@@ -566,3 +566,22 @@ anduin@anduinos-pl:/swarm-vol/sites-data$ tree
 * Caddy **只信任Cloudflare** 作为前置代理
 
 实际业务运行是无感的，它们仍然会获得 `X-Forwarded-For` 头部的真实 IP 地址。
+
+## 乌云
+
+上面的配置虽然无比安全，当然有一点点乌云。其中最严重的问题就是：
+
+* 内部的服务互相访问的时候，有的时候会去 Cloudflare 绕路。
+
+其中最典型的就是：Authentik 等强制要求 HTTPS 的服务、Registry 等必须填写公共 Endpoint 的服务。一个数据中心往往内部流量是非常多的，例如：
+
+* Authentik
+* Registry
+* GitLab Runner
+* Grafana
+* Prometheus
+* ClickHouse
+
+这些服务如果都通过 Cloudflare 访问，势必会增加延迟，降低性能。
+
+但是，现在几乎不可能不绕路。因为 Caddy 强制 mTLS 验证，非 Cloudflare 的请求根本无法通过验证。因此，这是上述架构的一朵乌云。我们有一个办法，可以在稍微降低安全性的前提下，解决这个问题。
