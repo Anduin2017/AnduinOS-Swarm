@@ -9,7 +9,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Extract domains from all .conf files (excluding cloudflare_ips.conf)
 echo "Scanning for .conf files in stage2/stacks and stage4/stacks..."
-DOMAINS=$(grep -h "^[a-zA-Z0-9.-]*\.anduinos\.com" \
+DOMAINS=$(grep -hE "^[a-zA-Z0-9.-]+\.[a-zA-Z]+ \{" \
     "$REPO_ROOT"/stage2/stacks/**/*.conf \
     "$REPO_ROOT"/stage4/stacks/**/*.conf \
     2>/dev/null | sed 's/ {.*//' | sort -u)

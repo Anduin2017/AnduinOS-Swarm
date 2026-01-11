@@ -585,3 +585,84 @@ anduin@anduinos-pl:/swarm-vol/sites-data$ tree
 这些服务如果都通过 Cloudflare 访问，势必会增加延迟，降低性能。
 
 但是，现在几乎不可能不绕路。因为 Caddy 强制 mTLS 验证，非 Cloudflare 的请求根本无法通过验证。因此，这是上述架构的一朵乌云。我们有一个办法，可以在稍微降低安全性的前提下，解决这个问题。
+
+我们：
+
+* 不再检查 mTLS
+* 不再返回 Cloudflare 的证书，而是直接基于 Cloudflare 的 API Token 去申请 DNS 来验证 Let's encrypt 的证书
+* 使用 IP 地址段来限制访问
+* 为了加速内网访问，使用容器别名
+
+```caddy
+# Auto-generated Cloudflare Configuration
+# Generated at: 2026-01-11 08:34:22 UTC
+
+# 1. Trust proxy configuration
+(cloudflare_trust) {
+    trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+}
+
+# 2. IP-based Access Control
+# Logic: If Request is NOT from Cloudflare AND NOT from Private Network -> Abort
+(limit_to_cloudflare) {
+    @denied {
+        # Condition 1: IP is NOT in Cloudflare ranges
+        not remote_ip 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+        
+        # Condition 2: IP is NOT in Docker/Local private ranges
+        # (Caddy joins these lines with AND logic)
+        not remote_ip private_ranges
+    }
+    
+    # Execute abort if the request matches the @denied criteria
+    abort @denied
+}
+
+{
+	# Email for Let's Encrypt notifications (certificate expiration, etc.)
+	email anduin@aiursoft.com
+	
+	# Global ACME configuration for Let's Encrypt DNS-01 challenge
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
+	log {
+		format json
+		output file /data/caddy/logs/web.log {
+			roll_size 1gb
+			roll_uncompressed
+		}
+		level debug
+	}
+
+	servers :443 {
+		import cloudflare_trust
+		
+		listener_wrappers {
+			http_redirect
+			tls
+		}
+	}
+}
+
+(hsts) {
+	header Strict-Transport-Security max-age=63072000
+}
+
+grafana.anduinos.com {
+    log
+    import hsts
+    import limit_to_cloudflare
+    encode br gzip
+    reverse_proxy http://grafana_grafana:3000
+}
+
+download.anduinos.com {
+	log
+	import hsts
+	import limit_to_cloudflare
+
+	encode br gzip
+
+	reverse_proxy http://download_web:5000
+}
+```
