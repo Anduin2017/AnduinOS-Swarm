@@ -23,18 +23,23 @@ cat > ./cloudflare_ips.conf << EOF
 
 # 1. Trust proxy configuration
 (cloudflare_trust) {
-	trusted_proxies static $ALL_RANGES
+    trusted_proxies static $ALL_RANGES
 }
 
 # 2. IP-based Access Control
-# Allow traffic from Cloudflare IPs and Docker internal networks only
+# Logic: If Request is NOT from Cloudflare AND NOT from Private Network -> Abort
 (limit_to_cloudflare) {
-	@allowed_traffic {
-		remote_ip $ALL_RANGES
-		remote_ip private_ranges
-	}
-	
-	abort not @allowed_traffic
+    @denied {
+        # Condition 1: IP is NOT in Cloudflare ranges
+        not remote_ip $ALL_RANGES
+        
+        # Condition 2: IP is NOT in Docker/Local private ranges
+        # (Caddy joins these lines with AND logic)
+        not remote_ip private_ranges
+    }
+    
+    # Execute abort if the request matches the @denied criteria
+    abort @denied
 }
 EOF
 
