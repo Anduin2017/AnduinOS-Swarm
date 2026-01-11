@@ -30,7 +30,7 @@ cat > ./cloudflare_ips.conf << EOF
 # Allow traffic from Cloudflare IPs and Docker internal networks only
 (limit_to_cloudflare) {
 	@allowed_traffic {
-		remote_ip forwarded
+		remote_ip $ALL_RANGES
 		remote_ip private_ranges
 	}
 	
