@@ -533,7 +533,7 @@ networks:
 
 其中 `/swarm-vol/sites-data` 目录结构如下：
 
-```
+```bash
 anduin@anduinos-pl:/swarm-vol/sites-data$ tree
 .
 └── caddy
@@ -592,6 +592,158 @@ anduin@anduinos-pl:/swarm-vol/sites-data$ tree
 * 不再返回 Cloudflare 的证书，而是直接基于 Cloudflare 的 API Token 去申请 DNS 来验证 Let's encrypt 的证书
 * 使用 IP 地址段来限制访问
 * 为了加速内网访问，使用容器别名
+
+为了完成上面几个过程，我们需要修改 `cloudflare_ips.conf` 文件，变成下面这样：
+
+```bash
+#!/bin/bash
+set -e
+
+echo "Fetching Cloudflare IP ranges..."
+
+# Fetch IPv4 ranges
+echo "Fetching IPv4 ranges from https://www.cloudflare.com/ips-v4"
+IPV4_RANGES=$(curl -s https://www.cloudflare.com/ips-v4 | tr '\n' ' ')
+
+# Fetch IPv6 ranges
+echo "Fetching IPv6 ranges from https://www.cloudflare.com/ips-v6"
+IPV6_RANGES=$(curl -s https://www.cloudflare.com/ips-v6 | tr '\n' ' ')
+
+# Combine all ranges
+ALL_RANGES="$IPV4_RANGES $IPV6_RANGES"
+
+echo "Generating cloudflare_ips.conf..."
+
+# Generate the configuration file
+cat > ./cloudflare_ips.conf << EOF
+# Auto-generated Cloudflare Configuration
+# Generated at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+
+# 1. Trust proxy configuration
+(cloudflare_trust) {
+    trusted_proxies static $ALL_RANGES
+}
+
+# 2. IP-based Access Control
+# Logic: If Request is NOT from Cloudflare AND NOT from Private Network -> Abort
+(limit_to_cloudflare) {
+    @denied {
+        # Condition 1: IP is NOT in Cloudflare ranges
+        not remote_ip $ALL_RANGES
+        
+        # Condition 2: IP is NOT in Docker/Local private ranges
+        # (Caddy joins these lines with AND logic)
+        not remote_ip private_ranges
+    }
+    
+    # Execute abort if the request matches the @denied criteria
+    abort @denied
+}
+EOF
+
+echo "✓ Cloudflare IP configuration generated successfully"
+echo "  IPv4 ranges: $(echo $IPV4_RANGES | wc -w)"
+echo "  IPv6 ranges: $(echo $IPV6_RANGES | wc -w)"
+echo "  Total ranges: $(echo $ALL_RANGES | wc -w)"
+```
+
+核心变化就是生成的 `(limit_to_cloudflare)` 片段变成了 IP 限制，而不是 mTLS 验证。
+
+另外，也不再返回 Cloudflare 的证书，而是使用 Let's Encrypt 的 DNS-01 挑战来获取证书。
+
+但是，显然我们的服务器在 Cloudflare 后面，几乎不可能办理下来证书。因此，我们必须使用 Cloudflare 的 API Token 来办理证书。
+
+我们修改 baseline 文件，变成下面这样：
+
+```
+{
+	# Email for Let's Encrypt notifications (certificate expiration, etc.)
+	email anduin@aiursoft.com
+	
+	# Global ACME configuration for Let's Encrypt DNS-01 challenge
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+
+	log {
+		format json
+		output file /data/caddy/logs/web.log {
+			roll_size 1gb
+			roll_uncompressed
+		}
+		level debug
+	}
+
+	servers :443 {
+		import cloudflare_trust
+		
+		listener_wrappers {
+			http_redirect
+			tls
+		}
+	}
+}
+
+(hsts) {
+	header Strict-Transport-Security max-age=63072000
+}
+```
+
+它引用了插件：`acme_dns cloudflare`，并且使用环境变量 `CLOUDFLARE_API_TOKEN` 来办理证书。此 TOKEN 可以在 Cloudflare 的 Dashboard 里生成，权限只需要 DNS 编辑权限即可。
+
+同样，我们也需要调整 Caddy 的 Dockerfile，去掉假证书的生成步骤，因为现在 Caddy 会自己办理证书。并且增加插件 `caddy-dns/cloudflare`。
+
+```Dockerfile
+# ============================
+# Prepare caddy Environment
+FROM localhost:8080/public_mirror/caddy:builder AS caddy-build-env
+
+RUN xcaddy build \
+    --with github.com/ueffel/caddy-brotli \
+    --with github.com/caddyserver/transform-encoder \
+    --with github.com/caddy-dns/cloudflare
+
+# ============================
+# Prepare Caddyfile build Environment
+FROM localhost:8080/box_starting/local_ubuntu AS config-build-env
+WORKDIR /app
+
+# Install curl for fetching Cloudflare IPs
+RUN apt-get update && \
+    apt-get install -y curl ca-certificates && \
+    mkdir -p /app/Dist && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY . .
+
+# Outputs to /app/Dist/Caddyfile
+RUN chmod +x /app/build_proxy.sh
+RUN /bin/bash /app/build_proxy.sh
+
+# ============================
+# Prepare Runtime Environment
+FROM localhost:8080/public_mirror/caddy:latest
+
+WORKDIR /app
+
+EXPOSE 80 443
+
+COPY --from=caddy-build-env /usr/bin/caddy /usr/bin/caddy
+COPY --from=config-build-env /app/Dist/Caddyfile /etc/caddy/Caddyfile
+
+
+
+# Now we can safely validate the Caddyfile with dummy certificates in place
+# We inject a dummy token here just to pass the validation check during build.
+# The real token will be provided at runtime via Docker Service environment variables.
+# Note: The token must look like a valid Cloudflare token (approx 40 chars) to pass validation.
+RUN CLOUDFLARE_API_TOKEN=ThisIsAFakeTokenForValidationOnly123456 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile && \
+    mkdir -p /var/log/caddy /data/caddy/logs && \
+    touch /data/caddy/logs/web.log
+
+ENTRYPOINT ["sh", "-c", "caddy run --config /etc/caddy/Caddyfile --adapter caddyfile & tail -f /data/caddy/logs/web.log & wait"]
+
+```
+
+这样调整后，Caddy 就能通过 Cloudflare API Token 办理证书，并且只允许 Cloudflare IP 和自己的私有网络访问。最终生成的 `cloudflare_ips.conf` 文件大概如下：
 
 ```caddy
 # Auto-generated Cloudflare Configuration
@@ -666,3 +818,79 @@ download.anduinos.com {
 	reverse_proxy http://download_web:5000
 }
 ```
+
+最后，我们需要确保我们的业务容器在连接 Caddy 的时候，使用容器别名或者私有网络 IP 地址，而不是公共域名。这样就能避免流量绕路 Cloudflare 了。
+
+这需要我们将 `docker-compose` 文件进行调整，例如：
+
+```yaml
+version: '3.9'
+
+services:
+  sites:
+    image: localhost:8080/box_starting/local_sites
+    ports:
+      # These ports are for internal use. For external, FRP will handle it.
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+    networks:
+      proxy_app:
+        aliases:
+          # Adding aliases for internal access to avoid Cloudflare routing
+          - download.anduinos.com
+          - tracer.anduinos.com
+          - grafana.anduinos.com
+    environment:
+      # Cloudflare API token for Let's Encrypt DNS-01 challenge
+      # Create token at: Cloudflare Dashboard -> My Profile -> API Tokens
+      # Required permissions: Zone:DNS:Edit for target zones
+      - CLOUDFLARE_API_TOKEN={{CLOUDFLARE_API_TOKEN}}
+    volumes:
+      - sites-data:/data
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 16G
+      update_config:
+        order: stop-first
+        delay: 60s
+
+
+volumes:
+  sites-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /swarm-vol/sites-data
+
+networks:
+  proxy_app:
+    external: true
+  clickhouse_net:
+    external: true
+
+```
+
+其中 `networks.proxy_app.aliases` 部分，添加了各个业务的容器别名。这样，业务容器在访问 Caddy 的时候，就会直接通过 Docker 内网访问，而不会绕路 Cloudflare 了。
+
+最终，为了验证配置的有效性，可以去任意一个非 `caddy` 的容器里，使用 `curl` 去访问 Caddy：
+
+```bash
+apt-get update && apt-get install -y curl
+curl -v https://download.anduinos.com
+```
+
+如果解析出来的 IP 地址是 Caddy 的内网 IP 地址，而不是 Cloudflare 的 IP 地址，说明配置成功。
+
+这样配置完了以后，我们的安全性稍微有一点点下降（不再验证 mTLS），但是维护压力大幅降低。所有业务既可以去 Cloudflare 绕一圈儿，也可以直接通过内网访问 Caddy。并且黑客因为无法伪造 Cloudflare 的 IP 段，依然很难攻击到 Caddy。
+
+当然，这样增加的安全风险，就是验证 mTLS 的功能被放弃了。这丧失了 0信任，但是转而使用了通用信任。仍然是业界标准的安全等级。
