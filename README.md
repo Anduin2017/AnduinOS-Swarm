@@ -666,3 +666,141 @@ download.anduinos.com {
 	reverse_proxy http://download_web:5000
 }
 ```
+
+```mermaid
+graph LR
+    %% ==========================================
+    %% 1. 🎨 高级样式定义 (Premium Styles)
+    %% ==========================================
+    classDef base fill:#fff,stroke:#333,stroke-width:1px,rx:5,ry:5;
+    
+    %% 用户 & 终端 (绿色系 - 圆角)
+    classDef user fill:#e3f2fd,stroke:#2196f3,stroke-width:2px,rx:10,ry:10,color:#0d47a1;
+    
+    %% 云设施 (黄色系 - 云状/不对称)
+    classDef cloud fill:#fff8e1,stroke:#ffc107,stroke-width:2px,rx:5,ry:5,stroke-dasharray: 2 2;
+    
+    %% 路由器 (青色系 - 六边形)
+    classDef router fill:#e0f2f1,stroke:#009688,stroke-width:2px,color:#004d40;
+    
+    %% 核心网关 (紫色系 - 体育场形/胶囊形)
+    classDef gateway fill:#f3e5f5,stroke:#9c27b0,stroke-width:3px,color:#4a148c,rx:20,ry:20;
+    
+    %% 守护进程 (灰色系 - 圆形)
+    classDef process fill:#f5f5f5,stroke:#9e9e9e,stroke-width:1px,stroke-dasharray: 3 3,rx:5,ry:5;
+    
+    %% 业务应用 (白色 - 强边框)
+    classDef app fill:#ffffff,stroke:#343a40,stroke-width:2px,rx:2,ry:2;
+    
+    %% DNS 逻辑节点 (橙色)
+    classDef dnsnode fill:#fff3e0,stroke:#ff9800,stroke-width:2px,rx:50,ry:50;
+
+    %% ==========================================
+    %% 2. 外部世界
+    %% ==========================================
+    subgraph Ext [☁️ 外部网络 / Internet]
+        direction TB
+        WebUser([🟢 Web 用户]):::user
+        SSHUser([🧑‍💻 SSH/MC 用户]):::user
+
+        subgraph PublicInfra [公网基建]
+            direction TB
+            CF_Edge{{🛡️ Cloudflare Edge}}:::cloud
+            FRPS{{🚀 FRPS 服务器}}:::cloud
+        end
+    end
+
+    %% ==========================================
+    %% 3. 家庭网络 (左侧入口)
+    %% ==========================================
+    subgraph Home [🏠 苏州联通家庭宽带]
+        direction TB
+        
+        %% 路由器层
+        subgraph NetLayer [物理网络层]
+            direction TB
+            ImmortalWrt{{⚡ ImmortalWrt 路由器}}:::router
+            Local_Device([📱 家庭设备]):::user
+        end
+
+        %% ==========================================
+        %% 4. Docker Swarm (核心)
+        %% ==========================================
+        subgraph Swarm [🐳 Docker Swarm ProArt]
+            direction TB
+
+            %% 内部 DNS 逻辑 (放在顶部或中间以减少交叉)
+            Swarm_Resolver((🧭 Swarm DNS)):::dnsnode
+
+            %% 网关栈
+            subgraph GatewayStack [🏰 网关核心栈]
+                direction TB
+                Tunnel_Daemon(🚇 cloudflared 容器):::process
+                FRPC(🔗 frpc):::process
+                Caddy([⚡ Caddy 网关 ⚡]):::gateway
+            end
+
+            %% 业务应用
+            subgraph Apps [📦 业务容器]
+                direction TB
+                GitLab[🦊 GitLab]:::app
+                MC[🧱 Minecraft]:::app
+                WebApps[🌐 Tracer / Manhours / 大量业务应用]:::app
+            end
+        end
+    end
+
+    %% ==========================================
+    %% 5. 流量连线 (实线 - 黑色/深色)
+    %% ==========================================
+
+    %% A. 外网流量
+    WebUser ==>|HTTPS| CF_Edge
+    SSHUser ==>|TCP| FRPS
+    
+    CF_Edge ==>|Tunnel| Tunnel_Daemon
+    FRPS ==>|穿透| FRPC
+
+    Tunnel_Daemon ==>|HTTPS| Caddy
+    FRPC -.->|TCP直连| GitLab & MC
+
+    %% B. Caddy 分发
+    Caddy ==>|反代| WebApps
+    Caddy ==>|反代| GitLab
+
+    %% C. 家庭内网流量 (关键路径)
+    Local_Device == "3. HTTPS直连 (Caddy)" ==> Caddy
+    Local_Device -.->|4. 2202 TCP 端口直连| GitLab
+    Local_Device -.->|4. 25565 TCP 端口直连| MC
+
+    %% ==========================================
+    %% 6. DNS 逻辑连线 (虚线 - 橙色)
+    %% ==========================================
+    
+    %% DNS 请求流
+    Local_Device -. "1. DNS查询 *.aiursoft.com" .-> ImmortalWrt
+    ImmortalWrt -. "2. 劫持返回内网IP" .-> Local_Device
+
+    %% 容器内部降级逻辑
+    WebApps -. "DNS请求" .-> Swarm_Resolver
+    
+    Swarm_Resolver -.->|① 命中Alias| Caddy
+    Swarm_Resolver -.->|② 未命中: 问上游| ImmortalWrt
+    
+    ImmortalWrt -.->|③ 劫持回流| Caddy
+    ImmortalWrt -.->|④ 失败: 走公网| CF_Edge
+
+    %% ==========================================
+    %% 7. 连线样式微调 (让图看起来更干净)
+    %% ==========================================
+    linkStyle default stroke:#333,stroke-width:1px;
+    
+    %% 高亮主要数据流 (加粗)
+    linkStyle 0,1,2,3,4,7,8,9 stroke:#2196f3,stroke-width:2px;
+    
+    %% 高亮 Caddy 核心分发 (紫色)
+    linkStyle 7,8 stroke:#9c27b0,stroke-width:3px;
+    
+    %% 高亮 DNS 逻辑 (橙色虚线)
+    linkStyle 11,12,13,14,15,16,17 stroke:#ff9800,stroke-width:2px,stroke-dasharray: 3 3;
+```
