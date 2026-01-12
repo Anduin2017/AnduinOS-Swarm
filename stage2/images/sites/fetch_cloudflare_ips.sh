@@ -23,7 +23,7 @@ cat > ./cloudflare_ips.conf << EOF
 
 # 1. Trust proxy configuration
 (cloudflare_trust) {
-    trusted_proxies static $ALL_RANGES
+    trusted_proxies static $ALL_RANGES private_ranges
 }
 
 # 2. IP-based Access Control
