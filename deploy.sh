@@ -304,7 +304,7 @@ function create_network() {
     network_name=$1
     subnet=$2
     known_networks=$(sudo docker network ls --format '{{.Name}}')
-    if [[ $known_networks != *"$network_name"* ]]; then
+    if ! echo "$known_networks" | grep -Fxq "$network_name"; then
         print_warn "Creating network $network_name with subnet $subnet..."
         networkId=$(sudo docker network create --driver overlay --attachable --subnet $subnet --scope swarm $network_name)
         print_ok "Network $network_name created with id $networkId"
@@ -397,33 +397,45 @@ find . -name 'docker-compose.yml' | while read file; do
 done
 
 #=============================
-# Nvidia GPU Part
+# Docker Daemon Configuration
 #=============================
+print_ok "Configuring docker daemon..."
+
+if [ -f /etc/docker/daemon.json ]; then
+    old_hash_daemon=$(sha256sum /etc/docker/daemon.json | awk '{print $1}')
+else
+    old_hash_daemon=""
+fi
+
+if [ -f /etc/nvidia-container-runtime/config.toml ]; then
+    old_hash_nvidia=$(sha256sum /etc/nvidia-container-runtime/config.toml | awk '{print $1}')
+else
+    old_hash_nvidia=""
+fi
+
 if [ -f /usr/bin/nvidia-smi ]; then
-  print_ok "Configuring docker daemon for Nvidia GPU..."
-  GPU_IDS=$(valgrind /usr/bin/nvidia-smi -a 2> /dev/null | grep "GPU UUID" | awk '{print substr($4,5,36)}')
+  print_ok "Nvidia GPU detected. Configuring for Nvidia..."
+  raw_gpu_output=$(valgrind /usr/bin/nvidia-smi -a 2> /dev/null || true)
+  GPU_IDS=$(echo "$raw_gpu_output" | grep "GPU UUID" | awk '{print substr($4,5,36)}' || true)
   print_ok "Detected GPU UUIDs:"
   print_ok "$GPU_IDS"
   JSON_GPU_RESOURCES=""
   for ID in $GPU_IDS; do
       JSON_GPU_RESOURCES+="\"NVIDIA-GPU=$ID\","
   done
-  JSON_GPU_RESOURCES=${JSON_GPU_RESOURCES%,}  # 去掉最后一个逗号
-
-  if [ -f /etc/docker/daemon.json ]; then
-      old_hash_daemon=$(sha256sum /etc/docker/daemon.json | awk '{print $1}')
-  else
-      old_hash_daemon=""
-  fi
-
-  if [ -f /etc/nvidia-container-runtime/config.toml ]; then
-      old_hash_nvidia=$(sha256sum /etc/nvidia-container-runtime/config.toml | awk '{print $1}')
-  else
-      old_hash_nvidia=""
-  fi
+  JSON_GPU_RESOURCES=${JSON_GPU_RESOURCES%,}  # Remove trailing comma
 
   sudo tee /etc/docker/daemon.json > /dev/null <<EOF
 {
+  "insecure-registries": [
+    "localhost:8080"
+  ],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  },
+  "userland-proxy": false,
   "runtimes": {
     "nvidia": {
       "path": "/usr/bin/nvidia-container-runtime",
@@ -433,27 +445,45 @@ if [ -f /usr/bin/nvidia-smi ]; then
   "default-runtime": "nvidia",
   "node-generic-resources": [
     $JSON_GPU_RESOURCES
-  ],
-  "insecure-registries": [
-    "localhost:8080"
   ]
 }
 EOF
+
   sudo sed -i 's/#swarm-resource = "DOCKER_RESOURCE_GPU"/swarm-resource = "DOCKER_RESOURCE_GPU"/' /etc/nvidia-container-runtime/config.toml
 
-  new_hash_daemon=$(sha256sum /etc/docker/daemon.json | awk '{print $1}')
-  new_hash_nvidia=$(sha256sum /etc/nvidia-container-runtime/config.toml | awk '{print $1}')
-  if [ "$old_hash_daemon" != "$new_hash_daemon" ] || [ "$old_hash_nvidia" != "$new_hash_nvidia" ]; then
-      print_warn "Configuration files changed. Restarting docker service..."
-      sudo systemctl restart docker.service
-  else
-      print_ok "Configuration files not changed."
-  fi
 else
-  print_warn "Nvidia GPU not found. Skipping Nvidia GPU configuration. GPU pass-through will not be available."
+  print_warn "Nvidia GPU not found. Configuring standard docker daemon..."
+  
+  sudo tee /etc/docker/daemon.json > /dev/null <<EOF
+{
+  "insecure-registries": [
+    "localhost:8080"
+  ],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  },
+  "userland-proxy": false
+}
+EOF
+fi
+
+new_hash_daemon=$(sha256sum /etc/docker/daemon.json | awk '{print $1}')
+if [ -f /etc/nvidia-container-runtime/config.toml ]; then
+    new_hash_nvidia=$(sha256sum /etc/nvidia-container-runtime/config.toml | awk '{print $1}')
+else
+    new_hash_nvidia=""
+fi
+
+if [ "$old_hash_daemon" != "$new_hash_daemon" ] || [ "$old_hash_nvidia" != "$new_hash_nvidia" ]; then
+    print_warn "Configuration files changed. Restarting docker service..."
+    sudo systemctl restart docker.service
+else
+    print_ok "Configuration files not changed."
 fi
 #=============================
-# Nvidia GPU Part end
+# Docker Daemon Configuration End
 #=============================
 
 print_warn "=============================================================================="
